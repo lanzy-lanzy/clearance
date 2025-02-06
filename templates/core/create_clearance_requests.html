@@ -5,45 +5,154 @@
 {% include "components/student_sidenav.html" %}
 {% endblock %}
 {% block content %}
-<h2 class="text-2xl font-bold mb-4">Make a Clearance Request</h2>
-<table class="min-w-full bg-white border">
-    <thead>
-        <tr>
-            <th class="py-2 px-4 border">Office</th>
-            <th class="py-2 px-4 border">Request Status</th>
-            <th class="py-2 px-4 border">Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for office in offices %}
-        <tr>
-            <td class="py-2 px-4 border">{{ office.name }}</td>
-            <td class="py-2 px-4 border">
-                {% with cr=clearance_requests|dict_get:office.id %}
-                    {% if cr %}
-                        {{ cr.get_status_display }}
-                    {% else %}
-                        Not Requested
-                    {% endif %}
-                {% endwith %}
-            </td>
-            <td class="py-2 px-4 border">
-                {% with cr=clearance_requests|dict_get:office.id %}
-                    {% if not cr %}
-                    <form method="POST">
-                        {% csrf_token %}
-                        <input type="hidden" name="office_id" value="{{ office.id }}">
-                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">
-                            Request
-                        </button>
-                    </form>
-                    {% else %}
-                        <span class="text-gray-600">Requested</span>
-                    {% endif %}
-                {% endwith %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="max-w-6xl mx-auto p-6">
+    <!-- Progress Overview Card -->
+    <div class="mb-8 bg-white rounded-lg shadow-lg p-6">
+        <h3 class="text-xl font-semibold mb-4 text-gray-800">Clearance Progress</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Checklist Card -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h4 class="text-lg font-medium mb-3 text-gray-700">Office Approval Status</h4>
+                <div class="space-y-3">
+                    {% for office in offices %}
+                    {% with cr=clearance_requests|dict_get:office.id %}
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            {% if cr and cr.get_status_display == 'Approved' %}
+                            <span class="flex h-6 w-6 items-center justify-center rounded-full bg-green-100">
+                                <svg class="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </span>
+                            {% else %}
+                            <span class="flex h-6 w-6 items-center justify-center rounded-full {% if cr %}bg-yellow-100{% else %}bg-gray-100{% endif %}">
+                                <svg class="h-4 w-4 {% if cr %}text-yellow-500{% else %}text-gray-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="ml-3 flex-grow">
+                            <span class="text-sm font-medium text-gray-900">{{ office.name }}</span>
+                        </div>
+                        <div class="ml-2">
+                            {% if cr %}
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if cr.get_status_display == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% elif cr.get_status_display == 'Approved' %}bg-green-100 text-green-800
+                                {% elif cr.get_status_display == 'Rejected' %}bg-red-100 text-red-800{% endif %}">
+                                {{ cr.get_status_display }}
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Not Started</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Progress Statistics -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h4 class="text-lg font-medium mb-3 text-gray-700">Overall Progress</h4>
+                <div class="mb-4">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-sm font-medium text-gray-700">Completion Status</span>
+                        <span class="text-sm font-medium text-gray-700">
+                            {% with approved_count=0 %}
+                                {% for office in offices %}
+                                    {% with cr=clearance_requests|dict_get:office.id %}
+                                        {% if cr and cr.get_status_display == 'Approved' %}
+                                            {% with approved_count=approved_count|add:1 %}{% endwith %}
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endfor %}
+                                {{ approved_count }}/{{ offices|length }}
+                            {% endwith %}
+                        </span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-blue-600 h-2.5 rounded-full" style="width: {% widthratio approved_count offices|length 100 %}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Table -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-800">Clearance Requests</h2>
+        </div>
+        <table class="min-w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="py-3 px-6 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Office</th>
+                    <th class="py-3 px-6 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Request Status</th>
+                    <th class="py-3 px-6 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for office in offices %}
+                <tr class="hover:bg-gray-50 transition-colors duration-200">
+                    <td class="py-4 px-6 text-sm font-medium text-gray-900">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            </svg>
+                            {{ office.name }}
+                        </div>
+                    </td>
+                    <td class="py-4 px-6 text-sm">
+                        {% with cr=clearance_requests|dict_get:office.id %}
+                            {% if cr %}
+                                <span class="px-3 py-1 rounded-full text-sm
+                                    {% if cr.get_status_display == 'Pending' %}
+                                        bg-yellow-100 text-yellow-800
+                                    {% elif cr.get_status_display == 'Approved' %}
+                                        bg-green-100 text-green-800
+                                    {% elif cr.get_status_display == 'Rejected' %}
+                                        bg-red-100 text-red-800
+                                    {% endif %}
+                                ">
+                                    {{ cr.get_status_display }}
+                                </span>
+                            {% else %}
+                                <span class="px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800">
+                                    Not Requested
+                                </span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="py-4 px-6 text-sm">
+                        {% with cr=clearance_requests|dict_get:office.id %}
+                            {% if not cr %}
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="office_id" value="{{ office.id }}">
+                                <button type="submit" 
+                                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors duration-200 flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    Request
+                                </button>
+                            </form>
+                            {% else %}
+                                <span class="inline-flex items-center text-gray-600">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    Requested
+                                </span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}
