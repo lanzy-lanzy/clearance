@@ -1,21 +1,24 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
+import random
 from core.models import Office, Staff, Student, ClearanceRequest, Clearance, ProgramChair
 
 class Command(BaseCommand):
-    help = 'Populate database with initial sample data including offices, staff, students, and unlock permit for one sample student.'
+    help = 'Populate database with initial sample data including offices, staff, students, and program chair assignments'
 
     def handle(self, *args, **kwargs):
         # -------------------------
-        # Create required offices
+        # Create required offices (DSA updated)
         offices_data = [
-            {"name": "Admissions", "description": "Handles student admissions and records"},
-            {"name": "Library", "description": "Manages library clearances and dues"},
-            {"name": "Finance", "description": "Handles financial clearances and payments"},
-            {"name": "Dormitory", "description": "Manages dormitory clearances"},
-            {"name": "Department", "description": "Academic department clearances"},
-            {"name": "Student Affairs", "description": "Student activities and conduct clearances"}
+            {"name": "SSC", "description": "Student Services Center"},
+            {"name": "OSA", "description": "Office of Student Affairs"},
+            {"name": "Guidance Office", "description": "Provides student guidance and counseling"},
+            {"name": "Library Office", "description": "Manages library resources and clearances"},
+            {"name": "Laboratory In-charge", "description": "Oversees laboratory clearances and safety"},
+            {"name": "Accounting Office", "description": "Handles student financial clearances"},
+            {"name": "Registrar's Office", "description": "Manages academic records and clearances"},
+            {"name": "BH In-charge", "description": "Handles boarding house clearances"}
         ]
         for office_info in offices_data:
             office, created = Office.objects.get_or_create(
@@ -28,14 +31,16 @@ class Command(BaseCommand):
             )
 
         # -------------------------
-        # Create staff members for each office
+        # Create staff members for each updated office
         staff_data = [
-            {"username": "admissions_staff", "office_name": "Admissions", "role": "Admissions Officer"},
-            {"username": "library_staff", "office_name": "Library", "role": "Librarian"},
-            {"username": "finance_staff", "office_name": "Finance", "role": "Finance Officer"},
-            {"username": "dorm_owner", "office_name": "Dormitory", "role": "Dormitory Manager", "is_dormitory_owner": True},
-            {"username": "dept_staff", "office_name": "Department", "role": "Department Head"},
-            {"username": "student_affairs", "office_name": "Student Affairs", "role": "Student Affairs Officer"}
+            {"username": "ssc_staff", "office_name": "SSC", "role": "SSC Officer"},
+            {"username": "osa_staff", "office_name": "OSA", "role": "OSA Coordinator"},
+            {"username": "guidance_staff", "office_name": "Guidance Office", "role": "Guidance Counselor"},
+            {"username": "library_staff", "office_name": "Library Office", "role": "Librarian"},
+            {"username": "lab_incharge", "office_name": "Laboratory In-charge", "role": "Lab In-charge"},
+            {"username": "accounting_staff", "office_name": "Accounting Office", "role": "Accounting Officer"},
+            {"username": "registrar_staff", "office_name": "Registrar's Office", "role": "Registrar"},
+            {"username": "bh_incharge", "office_name": "BH In-charge", "role": "Boarding House Manager", "is_dormitory_owner": True}
         ]
         for staff_info in staff_data:
             # Create or get user account
@@ -68,7 +73,47 @@ class Command(BaseCommand):
             )
 
         # -------------------------
-        # Create sample students and their clearance data
+        # Create multiple ProgramChair (dean) users with designations
+        program_chair_data = [
+            {"username": "pc_set", "first_name": "SET", "last_name": "Dean", "email": "pc_set@example.com", "designation": "SET DEAN"},
+            {"username": "pc_ste", "first_name": "STE", "last_name": "Dean", "email": "pc_ste@example.com", "designation": "STE DEAN"},
+            {"username": "pc_socje", "first_name": "SOCJE", "last_name": "Dean", "email": "pc_socje@example.com", "designation": "SOCJE DEAN"},
+            {"username": "pc_safes", "first_name": "SAFES", "last_name": "Dean", "email": "pc_safes@example.com", "designation": "SAFES DEAN"},
+            {"username": "pc_ssb_set", "first_name": "SSB SET", "last_name": "Dean", "email": "pc_ssb_set@example.com", "designation": "SSB SET"},
+            {"username": "pc_ssb_ste", "first_name": "SSB STE", "last_name": "Dean", "email": "pc_ssb_ste@example.com", "designation": "SSB STE"},
+            {"username": "pc_ssb_socje", "first_name": "SSB SOCJE", "last_name": "Dean", "email": "pc_ssb_socje@example.com", "designation": "SSB SOCJE"},
+            {"username": "pc_ssb_safes", "first_name": "SSB SAFES", "last_name": "Dean", "email": "pc_ssb_safes@example.com", "designation": "SSB SAFES"}
+        ]
+        program_chairs_created = []
+        for pc_info in program_chair_data:
+            # Create or get the program chair user account
+            pc_user, created = User.objects.get_or_create(
+                username=pc_info["username"],
+                defaults={
+                    "first_name": pc_info["first_name"],
+                    "last_name": pc_info["last_name"],
+                    "email": pc_info["email"]
+                }
+            )
+            if created:
+                pc_user.set_password("pc_pass123")
+                pc_user.save()
+
+            # Create or get the ProgramChair profile
+            pc, created = ProgramChair.objects.get_or_create(
+                user=pc_user,
+                defaults={
+                    "designation": pc_info["designation"]
+                }
+            )
+            program_chairs_created.append(pc)
+            self.stdout.write(
+                self.style.SUCCESS(f"Created Program Chair: {pc.user.username} with designation {pc.designation}")
+                if created else self.style.WARNING(f"Program Chair exists: {pc.user.username}")
+            )
+
+        # -------------------------
+        # Create sample students and assign them a Program Chair (dean)
         students_data = [
             {
                 "username": "student1",
@@ -104,7 +149,7 @@ class Command(BaseCommand):
                 "is_boarder": True
             }
         ]
-        for student_info in students_data:
+        for idx, student_info in enumerate(students_data):
             # Create or get user account for the student
             user, created = User.objects.get_or_create(
                 username=student_info["username"],
@@ -140,33 +185,15 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(
                     f"Student exists: {student.user.get_full_name()} ({student.student_id})"
                 ))
-
-        # -------------------------
-        # Create Program Chair
-        program_chair_user, created = User.objects.get_or_create(
-            username="program_chair",
-            defaults={
-                "first_name": "Program",
-                "last_name": "Chair",
-                "email": "program_chair@example.com"
-            }
-        )
-        if created:
-            program_chair_user.set_password("pc_pass123")
-            program_chair_user.save()
-            msg = f"Created Program Chair user: {program_chair_user.username}"
-            self.stdout.write(self.style.SUCCESS(msg))
-        else:
-            msg = f"Program Chair user already exists: {program_chair_user.username}"
-            self.stdout.write(self.style.WARNING(msg))
-
-        program_chair, created = ProgramChair.objects.get_or_create(user=program_chair_user)
-        if created:
-            msg = f"Created Program Chair profile for: {program_chair_user.username}"
-            self.stdout.write(self.style.SUCCESS(msg))
-        else:
-            msg = f"Program Chair profile exists for: {program_chair_user.username}"
-            self.stdout.write(self.style.WARNING(msg))
+            # -------------------------
+            # Assign a Program Chair to the student based on a simple mapping
+            # For example, using the student index modulo the number of program chairs available:
+            assigned_pc = program_chairs_created[idx % len(program_chairs_created)]
+            student.program_chair = assigned_pc
+            student.save()
+            self.stdout.write(self.style.SUCCESS(
+                f"Assigned Program Chair {assigned_pc.user.get_full_name()} ({assigned_pc.designation}) to student: {student.student_id}"
+            ))
 
         # -------------------------
         # For demonstration purposes: Unlock permit for student1 if cleared
@@ -180,4 +207,5 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"Permit unlocked for student: {student.student_id}"))
         except Student.DoesNotExist:
             self.stdout.write(self.style.ERROR("Student with username 'student1' does not exist."))
-        self.stdout.write(self.style.SUCCESS("Successfully populated offices, staff, student, and program chair data"))
+
+        self.stdout.write(self.style.SUCCESS("Successfully populated offices, staff, students, and program chair data"))

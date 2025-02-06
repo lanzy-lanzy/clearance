@@ -2,7 +2,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from core.models import ClearanceRequest, Clearance, Staff
+from core.models import ClearanceRequest, Clearance, Staff, Student, Office,ProgramChair, User
 
 
 def home(request):
@@ -96,60 +96,63 @@ def student_dashboard(request):
           'approved_count': clearance_requests.filter(status='approved').count(),
           'denied_count': clearance_requests.filter(status='denied').count()
       }
-    
       return render(request, 'core/student_dashboard.html', context)
-from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
-from django.contrib import messages
 def register_view(request):
-    if request.method == 'POST':
-        username = request.POST['username']
-        
-        # Check if username exists before creating user
-        if User.objects.filter(username=username).exists():
-            messages.error(request, 'Username already taken. Please choose another.')
-            return render(request, 'registration/register.html')
-            
-        password = request.POST['password']
-        password2 = request.POST['password2']
-        email = request.POST['email']
-        first_name = request.POST['first_name']
-        last_name = request.POST['last_name']
-        student_id = request.POST['student_id']
-        course = request.POST['course']
-        year_level = request.POST['year_level']
-        is_boarder = request.POST.get('is_boarder') == 'on'
-
-        if password == password2:
-            # Create User
-            user = User.objects.create_user(
-                username=username,
-                password=password,
-                email=email,
-                first_name=first_name,
-                last_name=last_name
-            )
-
-            # Create Student Profile
-            student = Student.objects.create(
-                user=user,
-                student_id=student_id,
-                course=course,
-                year_level=year_level,
-                is_boarder=is_boarder
-            )
-
-            # Create initial clearance requests
-            student.create_clearance_requests()
-
-            # Log user in
-            login(request, user)
-            return redirect('dashboard')
-        else:
-            messages.error(request, 'Passwords do not match')
+        # Get all program chairs for the dropdown if needed
+        program_chairs = ProgramChair.objects.all()
     
-    return render(request, 'registration/register.html')
+        if request.method == 'POST':
+            username = request.POST['username']
+        
+            if User.objects.filter(username=username).exists():
+                messages.error(request, 'Username already taken. Please choose another.')
+                return render(request, 'registration/register.html', {'program_chairs': program_chairs})
+            
+            password = request.POST['password']
+            password2 = request.POST['password2']
+            email = request.POST['email']
+            first_name = request.POST['first_name']
+            last_name = request.POST['last_name']
+            student_id = request.POST['student_id']
+            course = request.POST['course']
+            year_level = request.POST['year_level']
+            is_boarder = request.POST.get('is_boarder') == 'on'
+            selected_pc_id = request.POST.get('program_chair')
+
+            if password == password2:
+                # Create User (this triggers the post_save, which creates the Student profile automatically)
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name
+                )
+            
+                # Now retrieve the auto-created student profile and update it
+                student = user.student
+                student.student_id = student_id
+                student.course = course
+                student.year_level = year_level
+                student.is_boarder = is_boarder
+                student.save()
+
+                # Create initial clearance requests if needed
+                student.create_clearance_requests()
+
+                # Assign the selected Program Chair to the student
+                if selected_pc_id:
+                    program_chair = ProgramChair.objects.filter(id=selected_pc_id).first()
+                    if program_chair:
+                        student.program_chair = program_chair
+                        student.save()
+
+                login(request, user)
+                return redirect('dashboard')
+            else:
+                messages.error(request, 'Passwords do not match')
+    
+        return render(request, 'registration/register.html', {'program_chairs': program_chairs})
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
@@ -356,8 +359,23 @@ from .models import Clearance
 def print_permit(request, clearance_id):
     # Retrieve the clearance record. This view assumes that clearance is unlocked.
     clearance = get_object_or_404(Clearance, pk=clearance_id)
+    
+    # Ensure that the current user is a program chair/dean
+    if not hasattr(request.user, 'programchair'):
+        messages.error(request, "You are not authorized to print permits.")
+        return redirect('login')
+    
+    # Check that the clearance record's student is assigned to the logged in program chair
+    if clearance.student.program_chair != request.user.programchair:
+        messages.error(request, "You are not allowed to print the permit for this student.")
+        return redirect('program_chair_dashboard')
+
+    # Retrieve the logo URL from the program chair
+    logo_url = clearance.student.program_chair.get_logo_url()
+
     context = {
         'clearance': clearance,
         'student': clearance.student,
+        'logo_url': logo_url,
     }
     return render(request, 'core/print_permit.html', context)

@@ -12,11 +12,11 @@
         <div class="absolute bottom-0 left-0 w-20 h-20 border-l-4 border-b-4 border-emerald-600 -m-1 rounded-bl-lg"></div>
         <div class="absolute bottom-0 right-0 w-20 h-20 border-r-4 border-b-4 border-emerald-600 -m-1 rounded-br-lg"></div>
 
-        <!-- Enhanced Header Section with Logo Space -->
+        <!-- Enhanced Header Section with Dynamic Logo -->
         <div class="text-center mb-8">
-            <!-- Logo Placeholder -->
+            <!-- Dynamic Logo -->
             <div class="w-24 h-24 mx-auto mb-4">
-                <img src="{% static 'img/permit_logo.png' %}" alt="JHCSC Logo" class="w-full h-full object-contain">
+                <img src="{% static logo_url %}" alt="{{ student.program_chair.designation }} Logo" class="w-full h-full object-contain">
             </div>
             <h1 class="text-2xl font-bold text-emerald-800 tracking-wider">J.H. CERILLES STATE COLLEGE</h1>
             <h2 class="text-xl font-semibold text-emerald-700 mt-2">DUMINGAG CAMPUS</h2>

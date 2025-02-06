@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.dispatch import receiver 
+from django.db.models.signals import post_save
 
 class Office(models.Model):
     """Represents different offices handling clearance."""
@@ -21,43 +23,77 @@ class Staff(models.Model):
         return f"{self.user.get_full_name()} - {self.office.name}"
 
 # Add ProgramChair model
+
+import os
+from django.conf import settings
+
 class ProgramChair(models.Model):
-    """Represents a program chair user responsible for final clearance approval."""
+    """Represents a program chair (dean) user responsible for final clearance approval."""
+    DESIGNATION_CHOICES = [
+         ('SET DEAN', 'SET DEAN'),
+         ('STE DEAN', 'STE DEAN'),
+         ('SOCJE DEAN', 'SOCJE DEAN'),
+         ('SAFES DEAN', 'SAFES DEAN'),
+         ('SSB SET', 'SSB SET'),
+         ('SSB STE', 'SSB STE'),
+         ('SSB SOCJE', 'SSB SOCJE'),
+         ('SSB SAFES', 'SSB SAFES'),
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    designation = models.CharField(max_length=50, choices=DESIGNATION_CHOICES)
 
     def __str__(self):
-        return self.user.get_full_name()
-from django.db import models
-from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+        return f"{self.user.get_full_name()} - {self.designation}"
+
+    def get_logo_url(self):
+        # Map each designation to a specific static logo path
+        logo_mapping = {
+            'SET DEAN': 'img/logo_set.png',
+            'STE DEAN': 'img/logo_ste.png',
+            'SOCJE DEAN': 'img/logo_socje.png',
+            'SAFES DEAN': 'img/logo_safes.png',
+            'SSB SET': 'img/logo_ssb_set.png',
+            'SSB STE': 'img/logo_ssb_ste.png',
+            'SSB SOCJE': 'img/logo_ssb_socje.png',
+            'SSB SAFES': 'img/logo_ssb_safes.png',
+        }
+        designated_logo = logo_mapping.get(self.designation)
+        if designated_logo:
+            # Construct the absolute path of the logo file
+            logo_path = os.path.join(settings.BASE_DIR, 'static', designated_logo)
+            if os.path.exists(logo_path):
+                return designated_logo
+        # Return default permit logo if designated logo is missing
+        return 'img/permit_logo.png'
 
 class Student(models.Model):
-    """Represents students requesting clearance."""
-    student_id = models.CharField(max_length=20, unique=True)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    course = models.CharField(max_length=255)
-    year_level = models.IntegerField()
-    is_boarder = models.BooleanField(default=False)  # Field to check if student is a boarder
-    created_at = models.DateTimeField(auto_now_add=True)
+        """Represents students requesting clearance."""
+        student_id = models.CharField(max_length=20, unique=True)
+        user = models.OneToOneField(User, on_delete=models.CASCADE)
+        course = models.CharField(max_length=255)
+        year_level = models.IntegerField()
+        is_boarder = models.BooleanField(default=False)  # Field to check if student is a boarder
+        created_at = models.DateTimeField(auto_now_add=True)
+        # New field: assign student to a program chair / dean
+        program_chair = models.ForeignKey(ProgramChair, on_delete=models.SET_NULL, null=True, blank=True, related_name="students")
 
-    @property
-    def full_name(self):
-        return self.user.get_full_name()
+        @property
+        def full_name(self):
+            return self.user.get_full_name()
 
-    def __str__(self):
-        return f"{self.full_name} ({self.student_id})"
-
-    def create_clearance_requests(self):
-        """Creates clearance requests for all required offices, including Dormitory if boarder."""
-        from core.models import Office, ClearanceRequest  # import here to avoid circular imports
-        required_offices = Office.objects.all()
-        dormitory_office = Office.objects.filter(name="Dormitory").first()
-        if self.is_boarder and dormitory_office:
-            # Ensure the dormitory office is included (it might already be in required_offices)
-            required_offices = required_offices | Office.objects.filter(id=dormitory_office.id)
-        for office in required_offices:
-            ClearanceRequest.objects.get_or_create(student=self, office=office)
+        def __str__(self):
+            return f"{self.full_name} ({self.student_id})"
+    
+        def create_clearance_requests(self):
+            """Creates clearance requests for all required offices, including Dormitory if boarder."""
+            from core.models import Office, ClearanceRequest  # import here to avoid circular imports
+            required_offices = Office.objects.all()
+            dormitory_office = Office.objects.filter(name="Dormitory").first()
+            if self.is_boarder and dormitory_office:
+                # Ensure the dormitory office is included (it might already be in required_offices)
+                required_offices = required_offices | Office.objects.filter(id=dormitory_office.id)
+            for office in required_offices:
+                ClearanceRequest.objects.get_or_create(student=self, office=office)
 @receiver(post_save, sender=User)
 def create_student_profile(sender, instance, created, **kwargs):
     # Only create a student profile automatically if the user is not staff/programchair

@@ -1,40 +1,50 @@
-<nav class="bg-gray-900 w-64 min-h-screen p-6">
+<nav class="bg-emerald-900 w-64 min-h-screen p-6">
   <div class="flex items-center gap-3 mb-8">
-    <!-- Example icon -->
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
-    </svg>
-    <h2 class="text-2xl font-bold text-white">Program Chair Panel</h2>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+      </svg>
+      <h2 class="text-2xl font-bold text-white">Program Chair Panel</h2>
   </div>
   <ul class="space-y-4">
-    <li>
-      <a href="{% url 'program_chair_dashboard' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-all duration-200">
-        <!-- Dashboard icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M3 3h4v4H3V3zM3 9h4v8H3V9zM9 3h8v4H9V3zM9 9h8v8H9V9z" />
-        </svg>
-        <span>Dashboard</span>
-      </a>
-    </li>
-
-    <li>
-      <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-all duration-200">
-        <!-- Manage Students icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M13 7H7v6h6V7z" />
-          <path fill-rule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm10 12H5V5h10v10z" clip-rule="evenodd" />
-        </svg>
-        <span>Manage Students</span>
-      </a>
-    </li>
-    <li>
-      <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-all duration-200">
-        <!-- Settings icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M11.3 1.046a1 1 0 00-2.6 0l-.617 1.544a5.992 5.992 0 00-1.207.694l-1.525-.382a1 1 0 00-1.262.735l-.287 1.664a5.992 5.992 0 00-.693 1.208L1.046 8.7a1 1 0 000 2.6l1.544.617c.165.532.406 1.034.694 1.207l-.382 1.525a1 1 0 00.735 1.262l1.664.287a5.992 5.992 0 001.208.693l.617 1.544a1 1 0 002.6 0l.617-1.544a5.992 5.992 0 001.208-.693l1.664-.287a1 1 0 00.735-1.262l-.382-1.525a5.992 5.992 0 00.694-1.207l1.544-.617a1 1 0 000-2.6l-1.544-.617a5.992 5.992 0 00-.694-1.208l.382-1.525a1 1 0 00-.735-1.262l-1.664-.287a5.992 5.992 0 00-1.208-.693L11.3 1.046zM10 13a3 3 0 110-6 3 3 0 010 6z" />
-        </svg>
-        <span>Settings</span>
-      </a>
-    </li>
+      <li>
+          <a href="{% url 'program_chair_dashboard' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M3 3h4v4H3V3zM3 9h4v8H3V9zM9 3h8v4H9V3zM9 9h8v8H9V9z" />
+              </svg>
+              <span>Dashboard</span>
+          </a>
+      </li>
+      <li>
+          <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+              </svg>
+              <span>Manage Students</span>
+          </a>
+      </li>
+      <li>
+          <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm4-1a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1z" clip-rule="evenodd"/>
+              </svg>
+              <span>Clearance Overview</span>
+          </a>
+      </li>
+      <li>
+          <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+              </svg>
+              <span>Program Settings</span>
+          </a>
+      </li>
+      <li>
+          <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm4-1a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1z" clip-rule="evenodd"/>
+              </svg>
+              <span>Generate Reports</span>
+          </a>
+      </li>
   </ul>
 </nav>
