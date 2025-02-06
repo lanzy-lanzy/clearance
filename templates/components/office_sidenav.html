@@ -1,0 +1,21 @@
+<nav class="bg-gray-800 w-64 min-h-screen p-6">
+  <h2 class="text-white text-2xl font-bold mb-6">Office Panel</h2>
+  <ul>
+      <li class="mb-3">
+          <a href="{% url 'office_dashboard' %}" class="block py-2 px-4 rounded text-gray-300 hover:bg-gray-700 hover:text-white">
+              Dashboard
+          </a>
+      </li>
+      <li class="mb-3">
+          <a href="{% url 'office_profile' %}" class="block py-2 px-4 rounded text-gray-300 hover:bg-gray-700 hover:text-white">
+              Profile
+          </a>
+      </li>
+      <li class="mb-3">
+          <a href="{% url 'office_settings' %}" class="block py-2 px-4 rounded text-gray-300 hover:bg-gray-700 hover:text-white">
+              Settings
+          </a>
+      </li>
+      <!-- Additional office links if needed -->
+  </ul>
+</nav>

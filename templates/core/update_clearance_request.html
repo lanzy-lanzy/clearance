@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Review Clearance Request{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">Review Clearance Request</h2>
+<div class="bg-white p-6 rounded shadow">
+    <p class="mb-2"><strong>Student:</strong> {{ clearance_request.student.user.get_full_name }}</p>
+    <p class="mb-2"><strong>Office:</strong> {{ clearance_request.office.name }}</p>
+    <p class="mb-2"><strong>Current Status:</strong> {{ clearance_request.get_status_display }}</p>
+    <p class="mb-2"><strong>Request Date:</strong> {{ clearance_request.request_date|date:"M d, Y H:i" }}</p>
+    
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        <div class="mb-4">
+            <label for="status" class="block text-gray-700">Status</label>
+            <select name="status" id="status" class="w-full border border-gray-300 p-2 rounded">
+                <option value="approved">Approve</option>
+                <option value="denied">Deny</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label for="remarks" class="block text-gray-700">Remarks</label>
+            <textarea name="remarks" id="remarks" class="w-full border border-gray-300 p-2 rounded" rows="4"></textarea>
+        </div>
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Submit</button>
+    </form>
+</div>
+{% endblock %}

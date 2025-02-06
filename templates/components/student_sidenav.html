@@ -1,0 +1,25 @@
+<nav class="bg-gray-800 w-64 min-h-screen p-6">
+    <h2 class="text-white text-2xl font-bold mb-6">Student Menu</h2>
+    <ul>
+        <li class="mb-3">
+            <a href="{% url 'student_dashboard' %}" class="block py-2 px-4 rounded text-gray-300 hover:bg-gray-700 hover:text-white">
+                Dashboard
+            </a>
+        </li>
+        <li class="mb-3">
+            <a href="#" class="block py-2 px-4 rounded text-gray-300 hover:bg-gray-700 hover:text-white">
+                My Profile
+            </a>
+        </li>
+        <li class="mb-3">
+            <a href="{% url 'clearance_requests' %}" class="block py-2 px-4 rounded text-gray-300 hover:bg-gray-700 hover:text-white">
+                Clearance Requests
+            </a>
+        </li>
+        <li class="mb-3">
+            <a href="#" class="block py-2 px-4 rounded text-gray-300 hover:bg-gray-700 hover:text-white">
+                Clearance Status
+            </a>
+        </li>    
+    </ul>
+</nav>

@@ -1,0 +1,28 @@
+{% with request.resolver_match.url_name as url_name %}
+<div id="sidebar" class="bg-gray-900 text-white w-64 min-h-screen p-5 transition-transform transform -translate-x-full md:translate-x-0 fixed md:relative">
+    <h2 class="text-xl font-bold mb-5">Clearance System</h2>
+    <nav>
+        <ul class="space-y-3">
+            <li>
+                <a href="{% url 'dashboard' %}" class="flex items-center space-x-2 p-3 rounded {% if url_name == 'dashboard' %}bg-gray-700{% else %}hover:bg-gray-700{% endif %}">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c1.5 0 3 1.5 3 3s-1.5 3-3 3-3-1.5-3-3 1.5-3 3-3z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M3 3h18M5 7h14M5 11h14M5 15h14"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            {% if user.office %}
+            <li>
+                <a href="{% url 'office_requests' user.office.id %}" class="flex items-center space-x-2 p-3 rounded {% if url_name == 'office_requests' %}bg-gray-700{% else %}hover:bg-gray-700{% endif %}">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14v-4m0-4h.01M21 12c0 4.5-3.5 8-8 8s-8-3.5-8-8 3.5-8 8-8 8 3.5 8 8z"/>
+                    </svg>
+                    <span>Office Requests</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+{% endwith %}

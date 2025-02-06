@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load dict_extras %}
+{% block title %}Create Clearance Request{% endblock %}
+{% block sidebar %}
+{% include "components/student_sidenav.html" %}
+{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">Make a Clearance Request</h2>
+<table class="min-w-full bg-white border">
+    <thead>
+        <tr>
+            <th class="py-2 px-4 border">Office</th>
+            <th class="py-2 px-4 border">Request Status</th>
+            <th class="py-2 px-4 border">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for office in offices %}
+        <tr>
+            <td class="py-2 px-4 border">{{ office.name }}</td>
+            <td class="py-2 px-4 border">
+                {% with cr=clearance_requests|dict_get:office.id %}
+                    {% if cr %}
+                        {{ cr.get_status_display }}
+                    {% else %}
+                        Not Requested
+                    {% endif %}
+                {% endwith %}
+            </td>
+            <td class="py-2 px-4 border">
+                {% with cr=clearance_requests|dict_get:office.id %}
+                    {% if not cr %}
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="office_id" value="{{ office.id }}">
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">
+                            Request
+                        </button>
+                    </form>
+                    {% else %}
+                        <span class="text-gray-600">Requested</span>
+                    {% endif %}
+                {% endwith %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
