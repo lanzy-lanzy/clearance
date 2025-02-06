@@ -75,15 +75,64 @@ class Command(BaseCommand):
         # -------------------------
         # Create multiple ProgramChair (dean) users with designations
         program_chair_data = [
-            {"username": "pc_set", "first_name": "SET", "last_name": "Dean", "email": "pc_set@example.com", "designation": "SET DEAN"},
-            {"username": "pc_ste", "first_name": "STE", "last_name": "Dean", "email": "pc_ste@example.com", "designation": "STE DEAN"},
-            {"username": "pc_socje", "first_name": "SOCJE", "last_name": "Dean", "email": "pc_socje@example.com", "designation": "SOCJE DEAN"},
-            {"username": "pc_safes", "first_name": "SAFES", "last_name": "Dean", "email": "pc_safes@example.com", "designation": "SAFES DEAN"},
-            {"username": "pc_ssb_set", "first_name": "SSB SET", "last_name": "Dean", "email": "pc_ssb_set@example.com", "designation": "SSB SET"},
-            {"username": "pc_ssb_ste", "first_name": "SSB STE", "last_name": "Dean", "email": "pc_ssb_ste@example.com", "designation": "SSB STE"},
-            {"username": "pc_ssb_socje", "first_name": "SSB SOCJE", "last_name": "Dean", "email": "pc_ssb_socje@example.com", "designation": "SSB SOCJE"},
-            {"username": "pc_ssb_safes", "first_name": "SSB SAFES", "last_name": "Dean", "email": "pc_ssb_safes@example.com", "designation": "SSB SAFES"}
-        ]
+            {
+                "username": "pc_set",
+                "first_name": "Zenon A.",
+                "last_name": "Matos, MIT",
+                "email": "pc_set@example.com",
+                "designation": "SET DEAN"
+            },
+            {
+                "username": "pc_ste",
+                "first_name": "Star Clyde",
+                "last_name": "Sebial, Ph.D",
+                "email": "pc_ste@example.com",
+                "designation": "STE DEAN"
+            },
+            {
+                "username": "pc_socje",
+                "first_name": "Mark E.",
+                "last_name": "Patalinghug, Ph.D",
+                "email": "pc_socje@example.com",
+                "designation": "SOCJE DEAN"
+            },
+            {
+                "username": "pc_safes",
+                "first_name": "Teonita Y.",
+                "last_name": "Velasco, Ed.D",
+                "email": "pc_safes@example.com",
+                "designation": "SAFES DEAN"
+            },
+            # The remaining program chairs can remain the same if needed
+            {
+                "username": "pc_ssb_set",
+                "first_name": "SSB SET",
+                "last_name": "Dean",
+                "email": "pc_ssb_set@example.com",
+                "designation": "SSB SET"
+            },
+            {
+                "username": "pc_ssb_ste",
+                "first_name": "SSB STE",
+                "last_name": "Dean",
+                "email": "pc_ssb_ste@example.com",
+                "designation": "SSB STE"
+            },
+            {
+                "username": "pc_ssb_socje",
+                "first_name": "SSB SOCJE",
+                "last_name": "Dean",
+                "email": "pc_ssb_socje@example.com",
+                "designation": "SSB SOCJE"
+            },
+            {
+                "username": "pc_ssb_safes",
+                "first_name": "SSB SAFES",
+                "last_name": "Dean",
+                "email": "pc_ssb_safes@example.com",
+                "designation": "SSB SAFES"
+            }
+        ]        
         program_chairs_created = []
         for pc_info in program_chair_data:
             # Create or get the program chair user account
