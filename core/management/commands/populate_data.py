@@ -1,10 +1,10 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
-from core.models import Office, Staff, Student, ClearanceRequest, Clearance
+from core.models import Office, Staff, Student, ClearanceRequest, Clearance, ProgramChair
 
 class Command(BaseCommand):
-    help = 'Populate database with initial sample data including offices, staff, and students.'
+    help = 'Populate database with initial sample data including offices, staff, students, and unlock permit for one sample student.'
 
     def handle(self, *args, **kwargs):
         # -------------------------
@@ -141,4 +141,43 @@ class Command(BaseCommand):
                     f"Student exists: {student.user.get_full_name()} ({student.student_id})"
                 ))
 
-        self.stdout.write(self.style.SUCCESS("Successfully populated offices, staff, and student data"))
+        # -------------------------
+        # Create Program Chair
+        program_chair_user, created = User.objects.get_or_create(
+            username="program_chair",
+            defaults={
+                "first_name": "Program",
+                "last_name": "Chair",
+                "email": "program_chair@example.com"
+            }
+        )
+        if created:
+            program_chair_user.set_password("pc_pass123")
+            program_chair_user.save()
+            msg = f"Created Program Chair user: {program_chair_user.username}"
+            self.stdout.write(self.style.SUCCESS(msg))
+        else:
+            msg = f"Program Chair user already exists: {program_chair_user.username}"
+            self.stdout.write(self.style.WARNING(msg))
+
+        program_chair, created = ProgramChair.objects.get_or_create(user=program_chair_user)
+        if created:
+            msg = f"Created Program Chair profile for: {program_chair_user.username}"
+            self.stdout.write(self.style.SUCCESS(msg))
+        else:
+            msg = f"Program Chair profile exists for: {program_chair_user.username}"
+            self.stdout.write(self.style.WARNING(msg))
+
+        # -------------------------
+        # For demonstration purposes: Unlock permit for student1 if cleared
+        try:
+            student = Student.objects.get(user__username="student1")
+            clearance, created = Clearance.objects.get_or_create(student=student)
+            # Simulate that this student's clearance has been verified
+            clearance.is_cleared = True
+            clearance.cleared_date = timezone.now()
+            clearance.unlock_permit()  # This sets program_chair_approved to True if is_cleared is True
+            self.stdout.write(self.style.SUCCESS(f"Permit unlocked for student: {student.student_id}"))
+        except Student.DoesNotExist:
+            self.stdout.write(self.style.ERROR("Student with username 'student1' does not exist."))
+        self.stdout.write(self.style.SUCCESS("Successfully populated offices, staff, student, and program chair data"))

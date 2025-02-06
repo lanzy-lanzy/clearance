@@ -20,6 +20,13 @@ class Staff(models.Model):
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.office.name}"
 
+# Add ProgramChair model
+class ProgramChair(models.Model):
+    """Represents a program chair user responsible for final clearance approval."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.user.get_full_name()
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -53,17 +60,17 @@ class Student(models.Model):
             ClearanceRequest.objects.get_or_create(student=self, office=office)
 @receiver(post_save, sender=User)
 def create_student_profile(sender, instance, created, **kwargs):
-    # Modify this logic if you want to auto create a Student profile for every new user;
-    # here we'll only auto-create if no Student already exists.
-    if created and not hasattr(instance, 'student'):
-        # You may wish to add default values or conditions. This is an example:
-        Student.objects.create(
-            user=instance,
-            student_id=f"UID{instance.id}",
-            course="Undeclared",
-            year_level=1,
-            is_boarder=False
-        )
+    # Only create a student profile automatically if the user is not staff/programchair
+    if created and not instance.is_staff and not hasattr(instance, 'programchair'):
+        # Only auto-create if no student profile exists
+        if not hasattr(instance, 'student'):
+            Student.objects.create(
+                user=instance,
+                student_id=f"UID{instance.id}",
+                course="Undeclared",
+                year_level=1,
+                is_boarder=False
+            )
 class ClearanceRequest(models.Model):
     """Represents clearance requests for students dynamically per office."""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='clearance_requests')

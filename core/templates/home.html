@@ -26,11 +26,10 @@
                         Register Now
                     </a>
                     {% else %}
-                    <a href="{% if user.student %}{% url 'student_dashboard' %}{% else %}{% url 'office_dashboard' %}{% endif %}" class="px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:py-4 md:text-lg md:px-10">
+                    <a href="{% if user.staff %}{% url 'office_dashboard' %}{% else %}{% url 'student_dashboard' %}{% endif %}" class="px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:py-4 md:text-lg md:px-10">
                         Go to Dashboard
                     </a>
-                    {% endif %}
-                </div>
+                    {% endif %}                </div>
             </div>
         </div>
     </div>

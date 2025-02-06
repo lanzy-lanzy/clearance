@@ -180,73 +180,80 @@ def login_view(request):
     
     return render(request, 'registration/login.html')
 from core.models import Office, Student, ClearanceRequest
-
 @login_required
 def create_clearance_requests(request):
-    """
-    Display a table of all available offices. For each office, if a clearance request
-    does not already exist for the logged in student, the student can click a button to
-    create the request.
-    """
-    try:
-        student = request.user.student
-    except Student.DoesNotExist:
-        messages.error(request, "Only students can access this page.")
-        return redirect('dashboard')
+      try:
+          student = request.user.student
+      except Student.DoesNotExist:
+          messages.error(request, "Only students can access this page.")
+          return redirect('dashboard')
 
-    offices = Office.objects.all()
-    # Build a dictionary mapping office.id to the student’s existing clearance request (if any)
-    clearance_requests = {cr.office.id: cr for cr in student.clearance_requests.all()}
+      offices = Office.objects.all()
+      # Build a dictionary mapping office.id to the student's existing clearance request (if any)
+      clearance_requests = {cr.office.id: cr for cr in student.clearance_requests.all()}
 
-    if request.method == "POST":
-        office_id = request.POST.get("office_id")
-        if office_id:
-            office = Office.objects.get(id=office_id)
-            cr, created = ClearanceRequest.objects.get_or_create(student=student, office=office)
-            if created:
-                messages.success(request, f"Clearance request submitted for {office.name}.")
-            else:
-                messages.warning(request, f"Clearance request for {office.name} already exists.")
-            return redirect("clearance_requests")
-
-    context = {
-        "offices": offices,
-        "clearance_requests": clearance_requests,
-    }
-    return render(request, "core/create_clearance_requests.html", context)
-
+      if request.method == "POST":
+          office_id = request.POST.get("office_id")
+          if office_id:
+              office = Office.objects.get(id=office_id)
+              cr = ClearanceRequest.objects.filter(student=student, office=office).first()
+              if cr:
+                  # If a denied request exists, allow re-submission and clear the denial reason.
+                  if cr.status == 'denied':
+                      cr.status = 'pending'
+                      cr.notes = ''
+                      cr.remarks = ''
+                      cr.request_date = timezone.now()
+                      cr.reviewed_date = None
+                      cr.save()
+                      messages.success(request, f"Clearance request re-submitted for {office.name}.")
+                  else:
+                      messages.warning(request, f"Clearance request for {office.name} already exists.")
+              else:
+                  ClearanceRequest.objects.create(student=student, office=office)
+                  messages.success(request, f"Clearance request submitted for {office.name}.")
+              return redirect("clearance_requests")
+                
+      context = {
+          "offices": offices,
+          "clearance_requests": clearance_requests,
+      }
+      return render(request, "core/create_clearance_requests.html", context)
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from core.models import ClearanceRequest, Staff
-
 @login_required
 def office_dashboard(request):
-    # Retrieve the staff object for the logged-in user.
-    try:
-        staff_member = request.user.staff
-    except Staff.DoesNotExist:
-        return render(request, 'core/not_authorized.html', {'message': 'You are not authorized to view this page.'})
+      try:
+          staff_member = request.user.staff
+      except Staff.DoesNotExist:
+          return render(request, 'core/not_authorized.html', {'message': 'You are not authorized to view this page.'})
 
-    current_office = staff_member.office
-    clearance_requests = ClearanceRequest.objects.filter(office=current_office)
+      current_office = staff_member.office
+      clearance_requests = ClearanceRequest.objects.filter(office=current_office)
 
-    if request.method == 'POST':
-        request_id = request.POST.get('clearance_request_id')
-        action = request.POST.get('action')
-        cr = get_object_or_404(ClearanceRequest, id=request_id, office=current_office)
-        if action == 'approve':
-            cr.status = 'approved'
-        elif action == 'deny':
-            cr.status = 'denied'
-        cr.save()
-        return redirect('office_dashboard')
+      if request.method == 'POST':
+          request_id = request.POST.get('clearance_request_id')
+          action = request.POST.get('action')
+          cr = get_object_or_404(ClearanceRequest, id=request_id, office=current_office)
+        
+          if action == 'approve':
+              cr.status = 'approved'
+          elif action == 'deny':
+              cr.status = 'denied'
+              cr.notes = request.POST.get('notes')  # Save the denial reason
+            
+          cr.reviewed_by = staff_member
+          cr.reviewed_date = timezone.now()
+          cr.save()
+        
+          return redirect('office_dashboard')
 
-    context = {
-        'office': current_office,
-        'clearance_requests': clearance_requests,
-    }
-    return render(request, 'core/office_dashboard.html', context)
-
+      context = {
+          'office': current_office,
+          'clearance_requests': clearance_requests,
+      }
+      return render(request, 'core/office_dashboard.html', context)
 
 def clearance_requests(request):
     # Replace with actual logic to list and manage clearance requests if needed.
@@ -260,36 +267,97 @@ def office_settings(request):
     # Replace with settings management logic.
     return render(request, 'core/office_settings.html')
 
-
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Q
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from .models import Clearance, Student
-
 class ProgramChairDashboardView(LoginRequiredMixin, TemplateView):
-    template_name = 'core/program_chair_dashboard.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Overall statistics
-        context['total_students'] = Student.objects.count()
-        context['pending_clearances'] = Clearance.objects.filter(is_cleared=True, program_chair_approved=False).count()
-        context['approved_clearances'] = Clearance.objects.filter(program_chair_approved=True).count()
-        
-        # Clearance status breakdown
-        context['clearance_stats'] = {
-            'ready_for_approval': Clearance.objects.filter(is_cleared=True, program_chair_approved=False),
-            'recently_approved': Clearance.objects.filter(program_chair_approved=True).order_by('-cleared_date')[:5]
-        }
-        
-        # Course-wise statistics
-        context['course_stats'] = Student.objects.values('course').annotate(
-            total=Count('id'),
-            cleared=Count('clearance', filter=Q(clearance__is_cleared=True))
-        )
-        
-        # Add student list to display on dashboard
-        context['students'] = Student.objects.all().order_by('user__first_name')
-        
+      template_name = 'core/program_chair_dashboard.html'
+  
+      def get_context_data(self, **kwargs):
+          context = super().get_context_data(**kwargs)
+      
+          # Only count student profiles where the user is not staff
+          context['total_students'] = Student.objects.filter(user__is_staff=False).count()
+          context['pending_clearances'] = Clearance.objects.filter(is_cleared=True, program_chair_approved=False).count()
+          context['approved_clearances'] = Clearance.objects.filter(program_chair_approved=True).count()
+      
+          # Clearance status for dashboard breakdown
+          context['clearance_stats'] = {
+              'ready_for_approval': Clearance.objects.filter(is_cleared=True, program_chair_approved=False),
+              'recently_approved': Clearance.objects.filter(program_chair_approved=True).order_by('-cleared_date')[:5]
+          }
+      
+          # Course-wise statistics and detailed student list filtered by non-staff users
+          context['course_stats'] = Student.objects.filter(user__is_staff=False).values('course').annotate(
+              total=Count('id'),
+              cleared=Count('clearance', filter=Q(clearance__is_cleared=True))
+          )
+          context['students'] = Student.objects.filter(user__is_staff=False).order_by('user__first_name')
+      
+          return context
+@login_required
+def unlock_permit_view(request, clearance_id):
+        """
+        Allows the Program Chair to unlock the permit for a student
+        who is already cleared by all offices.
+        """
+        clearance = get_object_or_404(Clearance, pk=clearance_id)
+
+        # Ensure the clearance is actually cleared before unlocking
+        if not clearance.is_cleared:
+            messages.error(request, "Cannot unlock permit. The student has not been cleared by all offices.")
+        else:
+            clearance.unlock_permit()
+            messages.success(request, f"Permit unlocked for {clearance.student.full_name}.")
+
+        return redirect('program_chair_dashboard')
         return context
+
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+class ProgramChairStudentsView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/program_chair_students.html'
+
+@login_required
+def re_request_clearance(request, request_id):
+    from django.utils import timezone
+    from django.contrib import messages
+    from core.models import ClearanceRequest, Student
+
+    try:
+        student = request.user.student
+    except Student.DoesNotExist:
+        messages.error(request, "Only students can perform this action.")
+        return redirect('student_dashboard')
+
+    cr = get_object_or_404(ClearanceRequest, pk=request_id, student=student)
+    if cr.status != 'denied':
+        messages.error(request, "Only denied requests can be re-submitted.")
+        return redirect('student_dashboard')
+
+    cr.status = 'pending'
+    cr.notes = ''      # clear the denial reason
+    cr.remarks = ''    # clear any extra remarks
+    cr.request_date = timezone.now()
+    cr.reviewed_date = None
+    cr.save()
+    messages.success(request, "Clearance request re-submitted successfully.")
+    return redirect('student_dashboard')
+
+from django.shortcuts import render, get_object_or_404
+from .models import Clearance
+
+@login_required
+def print_permit(request, clearance_id):
+    # Retrieve the clearance record. This view assumes that clearance is unlocked.
+    clearance = get_object_or_404(Clearance, pk=clearance_id)
+    context = {
+        'clearance': clearance,
+        'student': clearance.student,
+    }
+    return render(request, 'core/print_permit.html', context)
