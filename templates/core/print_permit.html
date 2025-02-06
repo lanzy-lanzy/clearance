@@ -87,7 +87,7 @@
             <span class="text-6xl font-bold text-emerald-800 rotate-45">JHCSC</span>
         </div>
 
-        <!-- Print Button -->
+        <!-- Print Button (Hidden during print) -->
         <div class="mt-8 text-center print:hidden">
             <button onclick="window.print()" 
                     class="bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition-colors duration-200 shadow-lg">
@@ -104,7 +104,20 @@
 
 <style>
   @media print {
-      /* Hide everything */
+      /* Reset background and remove shadows for cleaner print */
+      .shadow-2xl, button, svg { 
+          box-shadow: none !important; 
+      }
+      body, html {
+         background: #fff;
+         color: #000;
+         font-family: "Times New Roman", serif;
+      }
+      /* Hide interactive elements */
+      .print\:hidden {
+         display: none !important;
+      }
+      /* Hide everything initially */
       body * {
           visibility: hidden;
       }
@@ -112,20 +125,30 @@
       #print-section, #print-section * {
           visibility: visible;
       }
-      /* Ensure the print section is positioned correctly */
+      /* Center the print section and scale to fit one page */
       #print-section {
           position: absolute;
           top: 0;
-          left: 0;
+          left: 50%;
+          transform: translateX(-50%) scale(0.88);
+          transform-origin: top center;
           width: 100%;
+      }
+      /* Adjust tables and borders for prints */
+      table {
+          border: 1px solid #000;
+      }
+      th, td {
+          border: 1px solid #000;
+      }
+      /* Ensure colors print accurately */
+      * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
       }
       @page {
           size: A4;
           margin: 1cm;
-      }
-      body {
-          print-color-adjust: exact;
-          -webkit-print-color-adjust: exact;
       }
   }
 </style>
