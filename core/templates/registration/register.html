@@ -107,8 +107,7 @@
                 <div>
                     <label for="program_chair" class="block text-sm font-medium text-emerald-700">Choose your Dean</label>
                     <div class="mt-1">
-                        <select name="program_chair" id="program_chair" required 
-                            class="appearance-none block w-full px-3 py-2 border border-emerald-200 rounded-lg shadow-sm placeholder-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        <select name="program_chair" id="program_chair" required>
                             {% for chair in program_chairs %}
                                 <option value="{{ chair.id }}">{{ chair.user.get_full_name }} - {{ chair.designation }}</option>
                             {% endfor %}

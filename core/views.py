@@ -102,61 +102,64 @@ def student_dashboard(request):
       return render(request, 'core/student_dashboard.html', context)
 
 def register_view(request):
-        # Get all program chairs for the dropdown if needed
-        program_chairs = ProgramChair.objects.all()
+    # Get all program chairs for the dropdown if needed
+    program_chairs = ProgramChair.objects.all()
     
-        if request.method == 'POST':
-            username = request.POST['username']
+    if request.method == 'POST':
+        username = request.POST['username']
+    
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already taken. Please choose another.')
+            return render(request, 'registration/register.html', {'program_chairs': program_chairs})
         
-            if User.objects.filter(username=username).exists():
-                messages.error(request, 'Username already taken. Please choose another.')
-                return render(request, 'registration/register.html', {'program_chairs': program_chairs})
+        password = request.POST['password']
+        password2 = request.POST['password2']
+        email = request.POST['email']
+        first_name = request.POST['first_name']
+        last_name = request.POST['last_name']
+        student_id = request.POST['student_id']
+        course = request.POST['course']
+        year_level = request.POST['year_level']
+        is_boarder = request.POST.get('is_boarder') == 'on'
+        selected_pc_id = request.POST.get('program_chair')
+
+        if password == password2:
+            # Create User (this triggers the post_save signal which creates the Student profile automatically)
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                email=email,
+                first_name=first_name,
+                last_name=last_name
+            )
+        
+            # Now retrieve the auto-created student profile and update it
+            student = user.student
+            student.student_id = student_id
+            student.course = course
+            student.year_level = year_level
+            student.is_boarder = is_boarder
+            student.save()
+
+            # Create initial clearance requests if needed
+            student.create_clearance_requests()
+
+            # Auto-assign the selected Program Chair to the student if provided
+            if selected_pc_id:
+                program_chair = ProgramChair.objects.filter(id=selected_pc_id).first()
+                if program_chair:
+                    student.program_chair = program_chair
+                    student.save()
+                else:
+                    messages.error(request, "Selected Program Chair not found.")
+                    return render(request, 'registration/register.html', {'program_chairs': program_chairs})
             
-            password = request.POST['password']
-            password2 = request.POST['password2']
-            email = request.POST['email']
-            first_name = request.POST['first_name']
-            last_name = request.POST['last_name']
-            student_id = request.POST['student_id']
-            course = request.POST['course']
-            year_level = request.POST['year_level']
-            is_boarder = request.POST.get('is_boarder') == 'on'
-            selected_pc_id = request.POST.get('program_chair')
-
-            if password == password2:
-                # Create User (this triggers the post_save, which creates the Student profile automatically)
-                user = User.objects.create_user(
-                    username=username,
-                    password=password,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name
-                )
-            
-                # Now retrieve the auto-created student profile and update it
-                student = user.student
-                student.student_id = student_id
-                student.course = course
-                student.year_level = year_level
-                student.is_boarder = is_boarder
-                student.save()
-
-                # Create initial clearance requests if needed
-                student.create_clearance_requests()
-
-                # Assign the selected Program Chair to the student
-                if selected_pc_id:
-                    program_chair = ProgramChair.objects.filter(id=selected_pc_id).first()
-                    if program_chair:
-                        student.program_chair = program_chair
-                        student.save()
-
-                login(request, user)
-                return redirect('dashboard')
-            else:
-                messages.error(request, 'Passwords do not match')
+            login(request, user)
+            return redirect('student_dashboard')
+        else:
+            messages.error(request, 'Passwords do not match')
     
-        return render(request, 'registration/register.html', {'program_chairs': program_chairs})
+    return render(request, 'registration/register.html', {'program_chairs': program_chairs})
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
