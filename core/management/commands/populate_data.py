@@ -162,7 +162,7 @@ class Command(BaseCommand):
             )
 
         # -------------------------
-        # Create sample students and assign them a Program Chair (dean)
+        # Create sample students and assign them a designated Program Chair (dean)
         students_data = [
             {
                 "username": "student1",
@@ -198,6 +198,12 @@ class Command(BaseCommand):
                 "is_boarder": True
             }
         ]
+        # Define a mapping between student usernames and the designated program chair usernames.
+        designated_pc = {
+            "student1": "pc_set",
+            "student2": "pc_ste",
+            "student3": "pc_socje"
+        }
         for idx, student_info in enumerate(students_data):
             # Create or get user account for the student
             user, created = User.objects.get_or_create(
@@ -225,7 +231,7 @@ class Command(BaseCommand):
             if created:
                 # Create clearance requests for the student (using the model method)
                 student.create_clearance_requests()
-                # Create an initial final clearance record
+                # Create an initial final clearance record if not present
                 Clearance.objects.get_or_create(student=student)
                 self.stdout.write(self.style.SUCCESS(
                     f"Created student: {student.user.get_full_name()} ({student.student_id})"
@@ -235,14 +241,24 @@ class Command(BaseCommand):
                     f"Student exists: {student.user.get_full_name()} ({student.student_id})"
                 ))
             # -------------------------
-            # Assign a Program Chair to the student based on a simple mapping
-            # For example, using the student index modulo the number of program chairs available:
-            assigned_pc = program_chairs_created[idx % len(program_chairs_created)]
-            student.program_chair = assigned_pc
-            student.save()
-            self.stdout.write(self.style.SUCCESS(
-                f"Assigned Program Chair {assigned_pc.user.get_full_name()} ({assigned_pc.designation}) to student: {student.student_id}"
-            ))
+            # Assign a designated Program Chair to the student based on the mapping above.
+            pc_username = designated_pc.get(student_info["username"])
+            if pc_username:
+                assigned_pc = ProgramChair.objects.filter(user__username=pc_username).first()
+                if assigned_pc:
+                    student.program_chair = assigned_pc
+                    student.save()
+                    self.stdout.write(self.style.SUCCESS(
+                        f"Assigned Program Chair {assigned_pc.user.get_full_name()} ({assigned_pc.designation}) to student: {student.student_id}"
+                    ))
+                else:
+                    self.stdout.write(self.style.ERROR(
+                        f"Program Chair with username '{pc_username}' not found for student: {student.student_id}"
+                    ))
+            else:
+                self.stdout.write(self.style.WARNING(
+                    f"No designated Program Chair mapping for student: {student.student_id}"
+                ))
 
         # -------------------------
         # For demonstration purposes: Unlock permit for student1 if cleared

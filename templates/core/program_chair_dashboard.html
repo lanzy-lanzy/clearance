@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
-
+{% load myfilters %}
+{% load dict_extras%}
 {% block title %}
 Program Chair Dashboard
 {% endblock title %}
@@ -47,6 +48,39 @@ Program Chair Dashboard
     </div>
   </div>
 
+  
+  <!-- Assigned Students Section -->
+  <div class="bg-white shadow-lg rounded-xl p-6 border border-emerald-100 mb-8">
+    <h3 class="text-2xl font-bold mb-4 text-emerald-900">Assigned Students</h3>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead class="bg-emerald-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Name</th>
+            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Student ID</th>
+            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Course</th>
+            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Year Level</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-emerald-100">
+          {% for student in students %}
+          <tr class="hover:bg-emerald-50 transition-colors duration-200">
+            <td class="px-4 py-3 text-emerald-900 font-medium">{{ student.user.get_full_name }}</td>
+            <td class="px-4 py-3 text-emerald-800">{{ student.student_id }}</td>
+            <td class="px-4 py-3 text-emerald-800">{{ student.course }}</td>
+            <td class="px-4 py-3 text-emerald-800">{{ student.year_level }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="px-4 py-3 text-center text-emerald-600 italic">
+              No students assigned.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
   <!-- Clearance Breakdown Section -->
   <div class="flex flex-col md:flex-row gap-8 mb-8">
     <!-- Ready for Final Approval -->

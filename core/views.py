@@ -3,7 +3,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from core.models import ClearanceRequest, Clearance, Staff, Student, Office,ProgramChair, User
-
+from django.db.models import Count, Q
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from core.models import Student, Clearance
 
 def home(request):
     return render(request, 'home.html')
@@ -97,6 +100,7 @@ def student_dashboard(request):
           'denied_count': clearance_requests.filter(status='denied').count()
       }
       return render(request, 'core/student_dashboard.html', context)
+
 def register_view(request):
         # Get all program chairs for the dropdown if needed
         program_chairs = ProgramChair.objects.all()
@@ -270,39 +274,59 @@ def office_settings(request):
     # Replace with settings management logic.
     return render(request, 'core/office_settings.html')
 
-from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Q
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from .models import Clearance, Student
+
 class ProgramChairDashboardView(LoginRequiredMixin, TemplateView):
       template_name = 'core/program_chair_dashboard.html'
-  
+
       def get_context_data(self, **kwargs):
           context = super().get_context_data(**kwargs)
-      
-          # Only count student profiles where the user is not staff
-          context['total_students'] = Student.objects.filter(user__is_staff=False).count()
-          context['pending_clearances'] = Clearance.objects.filter(is_cleared=True, program_chair_approved=False).count()
-          context['approved_clearances'] = Clearance.objects.filter(program_chair_approved=True).count()
-      
+          pc = self.request.user.programchair  # current program chair
+
+          context['total_students'] = Student.objects.filter(
+              user__is_staff=False,
+              program_chair=pc
+          ).count()
+
+          context['pending_clearances'] = Clearance.objects.filter(
+              is_cleared=True, 
+              program_chair_approved=False, 
+              student__program_chair=pc
+          ).count()
+
+          context['approved_clearances'] = Clearance.objects.filter(
+              program_chair_approved=True,
+              student__program_chair=pc
+          ).count()
+
           # Clearance status for dashboard breakdown
           context['clearance_stats'] = {
-              'ready_for_approval': Clearance.objects.filter(is_cleared=True, program_chair_approved=False),
-              'recently_approved': Clearance.objects.filter(program_chair_approved=True).order_by('-cleared_date')[:5]
+              'ready_for_approval': Clearance.objects.filter(
+                  is_cleared=True, 
+                  program_chair_approved=False,
+                  student__program_chair=pc
+              ),
+              'recently_approved': Clearance.objects.filter(
+                  program_chair_approved=True,
+                  student__program_chair=pc
+              ).order_by('-cleared_date')[:5]
           }
-      
-          # Course-wise statistics and detailed student list filtered by non-staff users
-          context['course_stats'] = Student.objects.filter(user__is_staff=False).values('course').annotate(
+
+          # Course-wise statistics and the detailed student list filtered by program chair
+          context['course_stats'] = Student.objects.filter(
+              user__is_staff=False,
+              program_chair=pc
+          ).values('course').annotate(
               total=Count('id'),
               cleared=Count('clearance', filter=Q(clearance__is_cleared=True))
           )
-          context['students'] = Student.objects.filter(user__is_staff=False).order_by('user__first_name')
-      
+
+          # List of assigned students for this program chair
+          context['students'] = Student.objects.filter(
+              user__is_staff=False,
+              program_chair=pc
+          ).order_by('user__first_name')
+
           return context
-@login_required
 def unlock_permit_view(request, clearance_id):
         """
         Allows the Program Chair to unlock the permit for a student
