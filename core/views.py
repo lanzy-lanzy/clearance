@@ -6,7 +6,7 @@ from core.models import ClearanceRequest, Clearance, Staff, Student, Office,Prog
 from django.db.models import Count, Q
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from core.models import Student, Clearance
+from core.models import Student, Clearance, Payment
 
 def home(request):
     return render(request, 'home.html')
@@ -173,21 +173,25 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-            # Check if user is a program chair
+            # If the user is a Program Chair
             if hasattr(user, 'programchair'):
                 return redirect('program_chair_dashboard')
-            # if the user is a staff (or office staff), redirect to office_dashboard
+            # If the user is a Staff
             elif hasattr(user, 'staff'):
-                return redirect('office_dashboard')
-            # if the user has a student profile, redirect to student_dashboard
+                # Check if the staff is a dormitory owner
+                if user.staff.is_dormitory_owner:
+                    return redirect('bh_owner_dashboard')
+                else:
+                    return redirect('office_dashboard')
+            # If the user is a Student
             elif hasattr(user, 'student'):
                 return redirect('student_dashboard')
-            # fallback redirect if the user is neither
+            # Fallback
             else:
                 return redirect('login')
         else:
             messages.error(request, 'Invalid credentials')
-    
+
     return render(request, 'registration/login.html')
 from core.models import Office, Student, ClearanceRequest
 @login_required
@@ -406,3 +410,86 @@ def print_permit(request, clearance_id):
         'logo_url': logo_url,
     }
     return render(request, 'core/print_permit.html', context)
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+from django.contrib import messages
+from core.models import Payment, Student, Staff
+
+@login_required
+def payment_dashboard(request):
+      """View for a BH (Dormitory) owner to monitor all student payments."""
+      try:
+          # Restrict view only to staff who are dormitory owners
+          staff_member = request.user.staff
+          if not staff_member.is_dormitory_owner:
+              return render(request, 'core/not_authorized.html', {
+                  'message': 'You must be a BH/Dormitory owner to view this page.'
+              })
+      except Staff.DoesNotExist:
+          return render(request, 'core/not_authorized.html', {
+              'message': 'You are not authorized to view this page.'
+          })
+
+      # List all payments or only for boarders if you want to filter
+      payments = Payment.objects.select_related('student').all()
+      context = {
+          'payments': payments
+      }
+      return render(request, 'core/payment_dashboard.html', context)
+
+
+@login_required
+def update_payment(request, payment_id):
+      """Allows BH owner to mark a payment as 'paid' or 'unpaid'."""
+      payment = get_object_or_404(Payment, pk=payment_id)
+
+      try:
+          staff_member = request.user.staff
+          if not staff_member.is_dormitory_owner:
+              return render(request, 'core/not_authorized.html', {
+                  'message': 'You must be a BH/Dormitory owner to perform this action.'
+              })
+      except Staff.DoesNotExist:
+          return render(request, 'core/not_authorized.html', {
+              'message': 'You are not authorized to view this page.'
+          })
+
+      if request.method == 'POST':
+          action = request.POST.get('action')
+          if action == 'paid':
+              payment.is_paid = True
+              payment.payment_date = timezone.now()
+          elif action == 'unpaid':
+              payment.is_paid = False
+              payment.payment_date = None
+          payment.save()
+          messages.success(request, 'Payment status updated successfully.')
+          return redirect('payment_dashboard')
+
+      context = {
+          'payment': payment,
+      }
+      return render(request, 'core/update_payment.html', context)
+
+@login_required
+def bh_owner_dashboard(request):
+    """A dedicated dashboard for BH/Dormitory owners to mark payments or see statuses."""
+    try:
+        staff_member = request.user.staff
+        # Ensure the logged-in user is actually flagged as dormitory owner
+        if not staff_member.is_dormitory_owner:
+            return render(request, 'core/not_authorized.html', {
+                'message': 'You must be a BH (dormitory) owner to view this page.'
+            })
+    except Staff.DoesNotExist:
+        return render(request, 'core/not_authorized.html', {
+            'message': 'You are not authorized to view this page.'
+        })
+
+    # Example: retrieve Payment objects or clearance requests, filtered if needed
+    payments = Payment.objects.select_related('student').all()  # or filter only boarders
+    context = {
+        'payments': payments,
+    }
+    return render(request, 'core/bh_owner_dashboard.html', context)

@@ -8,8 +8,13 @@
 <div class="max-w-6xl mx-auto p-6">
     <!-- Progress Overview Card -->
     <div class="mb-8 bg-white rounded-xl shadow-lg p-6 border border-emerald-100">
-      <h3 class="text-xl font-bold mb-4 text-emerald-900">Clearance Progress</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <h3 class="text-xl font-bold mb-4 text-emerald-900 animate-fade-in flex items-center">
+            <span class="mr-2">Clearance Progress</span>
+            <svg class="h-6 w-6 text-emerald-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </h3>      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Checklist Card -->
         <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 shadow-md">
           <h4 class="text-lg font-bold mb-4 text-emerald-900">Office Approval Status</h4>
@@ -20,13 +25,13 @@
               <div class="flex-shrink-0">
                 {% if cr and cr.get_status_display == 'Approved' %}
                 <span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
-                  <svg class="h-5 w-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="h-5 w-5 text-emerald-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                   </svg>
                 </span>
                 {% else %}
                 <span class="flex h-8 w-8 items-center justify-center rounded-full {% if cr %}bg-amber-100{% else %}bg-gray-100{% endif %}">
-                  <svg class="h-5 w-5 {% if cr %}text-amber-500{% else %}text-gray-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="h-5 w-5 {% if cr %}text-amber-500{% else %}text-gray-500{% endif %} animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                 </span>
@@ -37,11 +42,24 @@
               </div>
               <div>
                 {% if cr %}
-                <span class="px-3 py-1 text-xs font-medium rounded-full
+                <span class="px-3 py-1 text-xs font-medium rounded-full flex items-center
                   {% if cr.get_status_display == 'Pending' %}bg-amber-100 text-amber-800
                   {% elif cr.get_status_display == 'Approved' %}bg-emerald-100 text-emerald-800
                   {% elif cr.get_status_display == 'Denied' %}bg-red-100 text-red-800{% endif %}">
                   {{ cr.get_status_display }}
+                  {% if cr.get_status_display == 'Pending' %}
+                    <svg class="w-4 h-4 ml-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  {% elif cr.get_status_display == 'Approved' %}
+                    <svg class="w-4 h-4 ml-1 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                  {% elif cr.get_status_display == 'Denied' %}
+                    <svg class="w-4 h-4 ml-1 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  {% endif %}
                 </span>
                 {% else %}
                 <span class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Not Started</span>

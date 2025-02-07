@@ -11,7 +11,7 @@ class Command(BaseCommand):
         # -------------------------
         # Create required offices (DSA updated)
         offices_data = [
-            {"name": "SSC", "description": "Student Services Center"},
+            {"name": "SET", "description": "School of Engineering and Technology"},
             {"name": "OSA", "description": "Office of Student Affairs"},
             {"name": "Guidance Office", "description": "Provides student guidance and counseling"},
             {"name": "Library Office", "description": "Manages library resources and clearances"},
@@ -33,7 +33,7 @@ class Command(BaseCommand):
         # -------------------------
         # Create staff members for each updated office
         staff_data = [
-            {"username": "ssc_staff", "office_name": "SSC", "role": "SSC Officer"},
+            {"username": "ssc_staff", "office_name": "SET", "role": "SET Officer"},
             {"username": "osa_staff", "office_name": "OSA", "role": "OSA Coordinator"},
             {"username": "guidance_staff", "office_name": "Guidance Office", "role": "Guidance Counselor"},
             {"username": "library_staff", "office_name": "Library Office", "role": "Librarian"},

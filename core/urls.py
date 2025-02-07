@@ -22,4 +22,6 @@ urlpatterns = [
   path('program-chair/students/', ProgramChairStudentsView.as_view(), name='program_chair_students'),
   path('re_request/<int:request_id>/', views.re_request_clearance, name='re_request_clearance'),
   path('print-permit/<int:clearance_id>/', views.print_permit, name='print_permit'),
+  path('bh-owner-dashboard/', views.bh_owner_dashboard, name='bh_owner_dashboard'),
 ]
+

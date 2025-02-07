@@ -172,3 +172,18 @@ class Clearance(models.Model):
     def __str__(self):
         return f"{self.student} - {'Cleared' if self.is_cleared else 'Not Cleared'} - {'Permit Unlocked' if self.program_chair_approved else 'Permit Locked'}"
 
+
+from django.db import models
+from django.contrib.auth.models import User
+
+# ...
+
+class Payment(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    is_paid = models.BooleanField(default=False)
+    payment_date = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        status = "Paid" if self.is_paid else "Unpaid"
+        return f"{self.student.full_name} - {status} - {self.amount}"

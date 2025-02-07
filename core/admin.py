@@ -10,8 +10,7 @@ class OfficeAdmin(admin.ModelAdmin):
 class StaffAdmin(admin.ModelAdmin):
     list_display = ('user', 'office', 'role', 'is_dormitory_owner')
     list_filter = ('office', 'is_dormitory_owner')
-    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'role')
-    raw_id_fields = ('user',)
+    search_fields = ('user__username', 'user__first_name', 'user__last_name')
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
