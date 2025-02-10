@@ -6,7 +6,19 @@ from django.utils import timezone
 
 class Office(models.Model):
     """Represents different offices handling clearance."""
+    OFFICE_TYPES = [
+        ('SET', 'SET'),
+        ('STE', 'STE'),
+        ('SOCJE', 'SOCJE'),
+        ('SAFES', 'SAFES'),
+        ('SSB SET', 'SSB SET'),
+        ('SSB STE', 'SSB STE'),
+        ('SSB SOCJE', 'SSB SOCJE'),
+        ('SSB SAFES', 'SSB SAFES'),
+        ('OTHER', 'OTHER'),
+    ]
     name = models.CharField(max_length=255, unique=True)
+    office_type = models.CharField(max_length=50, choices=OFFICE_TYPES, default='OTHER')
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -31,20 +43,16 @@ from django.conf import settings
 class ProgramChair(models.Model):
     """Represents a program chair (dean) user responsible for final clearance approval."""
     DESIGNATION_CHOICES = [
-         ('SET DEAN', 'SET DEAN'),
-         ('STE DEAN', 'STE DEAN'),
-         ('SOCJE DEAN', 'SOCJE DEAN'),
-         ('SAFES DEAN', 'SAFES DEAN'),
-         ('SSB SET', 'SSB SET'),
-         ('SSB STE', 'SSB STE'),
-         ('SSB SOCJE', 'SSB SOCJE'),
-         ('SSB SAFES', 'SSB SAFES'),
+        ('SET DEAN', 'School of Engineering and Technology (BSIT)'),
+        ('STE DEAN', 'School of Teacher Education (BPED,BEED,BSED,BAELS,BSMATH)'),
+        ('SOCJE DEAN', 'School of Criminal Justice Education (BSCRIM,BSISM)'),
+        ('SAFES DEAN', 'School of Agriculture Forestry and Environmental Science (BSA,BSAES,BCF)'),
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     designation = models.CharField(max_length=50, choices=DESIGNATION_CHOICES)
 
     def __str__(self):
-        return f"{self.user.get_full_name()} - {self.designation}"
+        return f"{self.user.get_full_name()} - {self.get_designation_display()}"
 
     def get_logo_url(self):
         # Map each designation to a specific static logo path
@@ -53,11 +61,8 @@ class ProgramChair(models.Model):
             'STE DEAN': 'img/logo_ste.png',
             'SOCJE DEAN': 'img/logo_socje.png',
             'SAFES DEAN': 'img/logo_safes.png',
-            'SSB SET': 'img/logo_ssb_set.png',
-            'SSB STE': 'img/logo_ssb_ste.png',
-            'SSB SOCJE': 'img/logo_ssb_socje.png',
-            'SSB SAFES': 'img/logo_ssb_safes.png',
         }
+
         designated_logo = logo_mapping.get(self.designation)
         if designated_logo:
             # Construct the absolute path of the logo file
@@ -68,26 +73,46 @@ class ProgramChair(models.Model):
         return 'img/permit_logo.png'
 
 class Student(models.Model):
-        """Represents students requesting clearance."""
-        student_id = models.CharField(max_length=20, unique=True)
-        user = models.OneToOneField(User, on_delete=models.CASCADE)
-        course = models.CharField(max_length=255)
-        year_level = models.IntegerField()
-        is_boarder = models.BooleanField(default=False)  # Field to check if student is a boarder
-        created_at = models.DateTimeField(auto_now_add=True)
-        # New field: assign student to a program chair / dean
-        program_chair = models.ForeignKey(ProgramChair, on_delete=models.SET_NULL, null=True, blank=True, related_name="students")
-        # New field: assign student to a dormitory owner
-        dormitory_owner = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, related_name="students_dorm", limit_choices_to={'is_dormitory_owner': True})
+    """Represents students requesting clearance."""
+    COURSE_CHOICES = {
+        'SET DEAN': [
+            ('BSIT', 'Bachelor of Science in Information Technology'),
+        ],
+        'STE DEAN': [
+            ('BPED', 'Bachelor in Physical Education'),
+            ('BEED', 'Bachelor in Elementary Education'),
+            ('BSED', 'Bachelor of Secondary Education'),
+            ('BAELS', 'Bachelor of Arts in English Language Studies'),
+            ('BSMATH', 'Bachelor of Science in Mathematics'),
+        ],
+        'SOCJE DEAN': [
+            ('BSCRIM', 'Bachelor of Science in Criminology'),
+            ('BSISM', 'Bachelor of Science in Industrial Security Management'),
+        ],
+        'SAFES DEAN': [
+            ('BSA', 'Bachelor of Science in Agriculture'),
+            ('BSAES', 'Bachelor of Science in Agricultural Engineering Science'),
+            ('BCF', 'Bachelor in Community Forestry'),
+        ],
+    }
 
-        @property
-        def full_name(self):
+    student_id = models.CharField(max_length=20, unique=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    course = models.CharField(max_length=255)
+    year_level = models.IntegerField()
+    is_boarder = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    program_chair = models.ForeignKey(ProgramChair, on_delete=models.SET_NULL, null=True, blank=True, related_name="students")
+    dormitory_owner = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, related_name="students_dorm", limit_choices_to={'is_dormitory_owner': True})
+
+    @property
+    def full_name(self):
             return self.user.get_full_name()
 
-        def __str__(self):
+    def __str__(self):
             return f"{self.full_name} ({self.student_id})"
     
-        def create_clearance_requests(self):
+    def create_clearance_requests(self):
             """Creates clearance requests for all required offices, including Dormitory if boarder."""
             from core.models import Office, ClearanceRequest  # import here to avoid circular imports
             required_offices = Office.objects.all()

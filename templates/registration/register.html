@@ -92,13 +92,36 @@
 							<input type="text" name="student_id" id="student_id" required
 										 class="mt-1 block w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500">
 						</div>
+						<!-- Dean Selection -->
+						<div>
+							<label for="program_chair" class="block text-sm font-medium text-gray-700">
+								<i class="fas fa-user-tie mr-2 text-emerald-600"></i>Choose your Dean
+							</label>
+							<select name="program_chair" id="program_chair" required
+									class="mt-1 block w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500">
+								<option value="">Select your dean</option>
+								{% for chair in program_chairs %}
+									{% if 'SSB' not in chair.designation %}
+										<option value="{{ chair.id }}" data-designation="{{ chair.designation }}">
+											{{ chair.user.get_full_name }} - {{ chair.get_designation_display }}
+										</option>
+									{% endif %}
+								{% endfor %}
+							</select>
+						</div>
+
+
+						<!-- Course Selection -->
 						<div>
 							<label for="course" class="block text-sm font-medium text-gray-700">
 								<i class="fas fa-book mr-2 text-emerald-600"></i>Course
 							</label>
-							<input type="text" name="course" id="course" required
-										 class="mt-1 block w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500">
+							<select name="course" id="course" required
+									class="mt-1 block w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500">
+								<option value="">Select your course</option>
+							</select>
 						</div>
+
 						<!-- Academic Details -->
 						<div>
 							<label for="year_level" class="block text-sm font-medium text-gray-700">
@@ -112,17 +135,8 @@
 								<option value="4">4th Year</option>
 							</select>
 						</div>
-						 <div>
-							<label for="program_chair" class="block text-sm font-medium text-gray-700">
-								<i class="fas fa-user-tie mr-2 text-emerald-600"></i>Choose your Dean
-							</label>
-							<select name="program_chair" id="program_chair" required
-											class="mt-1 block w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500">
-								{% for chair in program_chairs %}
-									<option value="{{ chair.id }}">{{ chair.user.get_full_name }} - {{ chair.designation }}</option>
-								{% endfor %}
-							</select>
-						</div>
+
+
 						<!-- Boarder Checkbox and Dormitory Owner Dropdown -->
 						<div class="flex items-center">
 							<input type="checkbox" name="is_boarder" id="is_boarder"
@@ -166,4 +180,32 @@
 		}
 	});
 </script>
+
+<script>
+const coursesBySchool = {
+	'SET DEAN': ['BSIT'],
+	'STE DEAN': ['BPED', 'BEED', 'BSED', 'BAELS', 'BSMATH'],
+	'SOCJE DEAN': ['BSCRIM', 'BSISM'],
+	'SAFES DEAN': ['BSA', 'BSAES', 'BCF']
+};
+
+const programChairSelect = document.getElementById('program_chair');
+const courseSelect = document.getElementById('course');
+
+programChairSelect.addEventListener('change', function() {
+	const selectedOption = this.options[this.selectedIndex];
+	const designation = selectedOption.getAttribute('data-designation');
+	const courses = coursesBySchool[designation] || [];
+	
+	courseSelect.innerHTML = '<option value="">Select your course</option>';
+	
+	courses.forEach(course => {
+		const option = document.createElement('option');
+		option.value = course;
+		option.textContent = course;
+		courseSelect.appendChild(option);
+	});
+});
+</script>
+
 {% endblock %}

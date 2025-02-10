@@ -28,45 +28,42 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Admin user already exists"))
 
         self.stdout.write(self.style.SUCCESS("\nCreating Offices..."))
-        # Create required offices (DSA updated)
-        offices_data = [
+        # Create all required offices
+        office_data = [
             {"name": "SET", "description": "School of Engineering and Technology"},
+            {"name": "STE", "description": "School of Teacher Education"},
+            {"name": "SOCJE", "description": "School of Criminal Justice Education"},
+            {"name": "SAFES", "description": "School of Agriculture, Forestry and Environmental Sciences"},
+            {"name": "SSB SET", "description": "SSB School of Engineering and Technology"},
+            {"name": "SSB STE", "description": "SSB School of Teacher Education"},
+            {"name": "SSB SOCJE", "description": "SSB School of Criminal Justice Education"},
+            {"name": "SSB SAFES", "description": "SSB School of Agriculture, Forestry and Environmental Sciences"},
+            {"name": "Dormitory", "description": "Dormitory Office"},
             {"name": "OSA", "description": "Office of Student Affairs"},
-            {"name": "Guidance Office", "description": "Provides student guidance and counseling"},
-            {"name": "Library Office", "description": "Manages library resources and clearances"},
-            {"name": "Laboratory In-charge", "description": "Oversees laboratory clearances and safety"},
-            {"name": "Accounting Office", "description": "Handles student financial clearances"},
-            {"name": "Registrar's Office", "description": "Manages academic records and clearances"}
+            {"name": "Guidance Office", "description": "Student Guidance Office"},
+            {"name": "Library Office", "description": "Library Services"},
+            {"name": "Laboratory In-charge", "description": "Laboratory Management"},
+            {"name": "Accounting Office", "description": "Financial Services"},
+            {"name": "Registrar's Office", "description": "Academic Records Management"}
         ]
 
-
-        # Create Dormitory Office first
-        dormitory_office, created = Office.objects.get_or_create(
-            name="Dormitory",
-            defaults={"description": "Handles boarding house clearances"}
-        )
-        if created:
-            self.stdout.write(self.style.SUCCESS(f"Created Dormitory Office"))
-        else:
-            self.stdout.write(self.style.WARNING(f"Dormitory Office already exists"))
-
-        # Remove Dormitory office from the general offices list if it exists
-        offices_data = [office for office in offices_data if office["name"] != "Dormitory"]
-
-        for office_info in offices_data:
+        offices_created = []
+        for office_info in office_data:
             office, created = Office.objects.get_or_create(
                 name=office_info["name"],
                 defaults={"description": office_info["description"]}
             )
+            offices_created.append(office)
             self.stdout.write(
-                self.style.SUCCESS(f"Created Office: {office.name}") if created
-                else self.style.WARNING(f"Office exists: {office.name}")
+                self.style.SUCCESS(f"Created office: {office.name}")
+                if created else self.style.WARNING(f"Office exists: {office.name}")
             )
 
-
-
+        # Get the dormitory office reference after creation
+        dormitory_office = Office.objects.get(name="Dormitory")
 
         self.stdout.write(self.style.SUCCESS("\nCreating BH Owners..."))
+
         # Create multiple BH owners
         bh_owners_data = [
             {
@@ -184,37 +181,9 @@ class Command(BaseCommand):
                 "last_name": "Velasco, Ed.D",
                 "email": "pc_safes@example.com",
                 "designation": "SAFES DEAN"
-            },
-            # The remaining program chairs can remain the same if needed
-            {
-                "username": "pc_ssb_set",
-                "first_name": "SSB SET",
-                "last_name": "Dean",
-                "email": "pc_ssb_set@example.com",
-                "designation": "SSB SET"
-            },
-            {
-                "username": "pc_ssb_ste",
-                "first_name": "SSB STE",
-                "last_name": "Dean",
-                "email": "pc_ssb_ste@example.com",
-                "designation": "SSB STE"
-            },
-            {
-                "username": "pc_ssb_socje",
-                "first_name": "SSB SOCJE",
-                "last_name": "Dean",
-                "email": "pc_ssb_socje@example.com",
-                "designation": "SSB SOCJE"
-            },
-            {
-                "username": "pc_ssb_safes",
-                "first_name": "SSB SAFES",
-                "last_name": "Dean",
-                "email": "pc_ssb_safes@example.com",
-                "designation": "SSB SAFES"
             }
-        ]        
+        ]
+
         program_chairs_created = []
         for pc_info in program_chair_data:
             # Create or get the program chair user account

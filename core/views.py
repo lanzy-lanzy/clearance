@@ -110,8 +110,11 @@ def student_dashboard(request):
 
 def register_view(request):
     # Get all program chairs and dormitory owners for the dropdowns
-    program_chairs = ProgramChair.objects.all()
+    program_chairs = ProgramChair.objects.filter(designation__in=[
+        'SET DEAN', 'STE DEAN', 'SOCJE DEAN', 'SAFES DEAN'
+    ])
     dormitory_owners = Staff.objects.filter(is_dormitory_owner=True)
+    
     context = {
         'program_chairs': program_chairs,
         'dormitory_owners': dormitory_owners
@@ -123,16 +126,29 @@ def register_view(request):
             messages.error(request, 'Username already taken. Please choose another.')
             return render(request, 'registration/register.html', context)
         
-        is_boarder = request.POST.get('is_boarder') == 'on'
-        selected_dorm_owner_id = request.POST.get('dormitory_owner')
-        
-        # Validate dormitory owner selection for boarders
-        if is_boarder and not selected_dorm_owner_id:
-            messages.error(request, 'Boarder students must select a dormitory owner.')
-            return render(request, 'registration/register.html', context)
-
+        # Validate password match
         if request.POST['password'] != request.POST['password2']:
             messages.error(request, 'Passwords do not match')
+            return render(request, 'registration/register.html', context)
+
+        # Validate course selection based on selected dean
+        selected_dean_id = request.POST.get('program_chair')
+        selected_course = request.POST.get('course')
+        
+        try:
+            program_chair = ProgramChair.objects.get(id=selected_dean_id)
+            valid_courses = {
+                'SET DEAN': ['BSIT'],
+                'STE DEAN': ['BPED', 'BEED', 'BSED', 'BAELS', 'BSMATH'],
+                'SOCJE DEAN': ['BSCRIM', 'BSISM'],
+                'SAFES DEAN': ['BSA', 'BSAES', 'BCF']
+            }
+            
+            if selected_course not in valid_courses.get(program_chair.designation, []):
+                messages.error(request, 'Invalid course selection for the chosen school')
+                return render(request, 'registration/register.html', context)
+        except ProgramChair.DoesNotExist:
+            messages.error(request, "Selected Program Chair not found.")
             return render(request, 'registration/register.html', context)
             
         # Create user and student profile
@@ -144,40 +160,47 @@ def register_view(request):
             last_name=request.POST['last_name']
         )
         
-        student = user.student
-        student.student_id = request.POST['student_id']
-        student.course = request.POST['course']
-        student.year_level = request.POST['year_level']
-        student.is_boarder = is_boarder
+        # Handle dormitory assignment
+        is_boarder = request.POST.get('is_boarder') == 'on'
+        selected_dorm_owner_id = request.POST.get('dormitory_owner')
         
-        # Assign program chair if provided
-        if selected_pc_id := request.POST.get('program_chair'):
-            if program_chair := ProgramChair.objects.filter(id=selected_pc_id).first():
-                student.program_chair = program_chair
-            else:
-                messages.error(request, "Selected Program Chair not found.")
-                user.delete()
-                return render(request, 'registration/register.html', context)
+        if is_boarder and not selected_dorm_owner_id:
+            messages.error(request, 'Boarder students must select a dormitory owner.')
+            user.delete()
+            return render(request, 'registration/register.html', context)
+
+        # Create or update student profile
+        student = Student.objects.create(
+            user=user,
+            student_id=request.POST['student_id'],
+            course=selected_course,
+            year_level=int(request.POST['year_level']),
+            is_boarder=is_boarder,
+            program_chair=program_chair
+        )
         
-        # Assign dormitory owner and create payment record for boarders
+        # Assign dormitory owner if student is a boarder
         if is_boarder and selected_dorm_owner_id:
-            if dorm_owner := Staff.objects.filter(id=selected_dorm_owner_id, is_dormitory_owner=True).first():
+            try:
+                dorm_owner = Staff.objects.get(id=selected_dorm_owner_id, is_dormitory_owner=True)
                 student.dormitory_owner = dorm_owner
                 student.save()
-                # Create initial payment record
+                
+                # Create initial payment record for boarders
                 Payment.objects.create(
                     student=student,
-                    amount=0.00,  # Default amount, can be updated by BH owner
+                    amount=0.00,
                     is_paid=False
                 )
-            else:
+            except Staff.DoesNotExist:
                 messages.error(request, "Selected dormitory owner not found.")
                 user.delete()
                 return render(request, 'registration/register.html', context)
         
-        student.save()
+        # Create clearance requests for the student
         student.create_clearance_requests()
         
+        # Log the user in and redirect to dashboard
         login(request, user)
         return redirect('student_dashboard')
     
@@ -269,8 +292,8 @@ def office_dashboard(request):
     """Dashboard for office staff to manage clearance requests."""
     try:
         staff_member = request.user.staff
+        # Check if user is a BH owner and redirect them
         if staff_member.is_dormitory_owner:
-            messages.error(request, 'BH owners should use the BH owner dashboard.')
             return redirect('bh_owner_dashboard')
     except Staff.DoesNotExist:
         messages.error(request, 'You are not authorized to view this page.')
