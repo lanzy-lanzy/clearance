@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.dispatch import receiver 
 from django.db.models.signals import post_save
+from django.utils import timezone
 
 class Office(models.Model):
     """Represents different offices handling clearance."""
@@ -76,6 +77,8 @@ class Student(models.Model):
         created_at = models.DateTimeField(auto_now_add=True)
         # New field: assign student to a program chair / dean
         program_chair = models.ForeignKey(ProgramChair, on_delete=models.SET_NULL, null=True, blank=True, related_name="students")
+        # New field: assign student to a dormitory owner
+        dormitory_owner = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, related_name="students_dorm", limit_choices_to={'is_dormitory_owner': True})
 
         @property
         def full_name(self):
@@ -127,24 +130,30 @@ class ClearanceRequest(models.Model):
         return f"{self.student} - {self.office} ({self.status})"
 
     def approve(self, staff):
-        """Approve the clearance request, only dormitory owner can approve dormitory requests."""
+        """Approve the clearance request with proper permission checks."""
         if self.office.name == "Dormitory":
             if not staff.is_dormitory_owner:
-                raise PermissionError("Only the dormitory owner can approve dormitory clearances.")
+                raise PermissionError("Only dormitory owners can approve dormitory clearances.")
+            if self.student.dormitory_owner != staff:
+                raise PermissionError("You can only approve clearances for your assigned students.")
+        
         self.status = "approved"
         self.reviewed_by = staff
-        self.reviewed_date = models.DateTimeField(auto_now=True)
+        self.reviewed_date = timezone.now()
         self.save()
 
     def deny(self, staff, reason):
-        """Deny the clearance request with a reason."""
+        """Deny the clearance request with proper permission checks."""
         if self.office.name == "Dormitory":
             if not staff.is_dormitory_owner:
-                raise PermissionError("Only the dormitory owner can deny dormitory clearances.")
+                raise PermissionError("Only dormitory owners can deny dormitory clearances.")
+            if self.student.dormitory_owner != staff:
+                raise PermissionError("You can only deny clearances for your assigned students.")
+        
         self.status = "denied"
         self.reviewed_by = staff
         self.notes = reason
-        self.reviewed_date = models.DateTimeField(auto_now=True)
+        self.reviewed_date = timezone.now()
         self.save()
 
 class Clearance(models.Model):

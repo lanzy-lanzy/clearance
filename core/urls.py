@@ -7,7 +7,6 @@ from .views import ProgramChairDashboardView, unlock_permit_view, ProgramChairSt
 
 urlpatterns = [
   path('', views.home, name='home'),  # Your home view
-  path('dashboard/', views.dashboard, name='dashboard'),  # Add this line
   path('register/', views.register_view, name='register'),
   path('login/', views.login_view, name='login'),
   path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
@@ -23,5 +22,15 @@ urlpatterns = [
   path('re_request/<int:request_id>/', views.re_request_clearance, name='re_request_clearance'),
   path('print-permit/<int:clearance_id>/', views.print_permit, name='print_permit'),
   path('bh-owner-dashboard/', views.bh_owner_dashboard, name='bh_owner_dashboard'),
+  path('payment-dashboard/', views.payment_dashboard, name='payment_dashboard'),
+  path('update-payment/<int:payment_id>/', views.update_payment, name='update_payment'),
+
+  # Admin URLs
+  path('dashboard/', views.admin_dashboard, name='admin_dashboard'),
+  path('dashboard/users/', views.admin_users, name='admin_users'),
+  path('dashboard/users/create/', views.admin_create_user, name='admin_create_user'),
+  path('dashboard/users/edit/<int:user_id>/', views.admin_edit_user, name='admin_edit_user'),
+  path('dashboard/offices/', views.admin_offices, name='admin_offices'),
+  path('dashboard/clearances/', views.admin_clearances, name='admin_clearances'),
 ]
 

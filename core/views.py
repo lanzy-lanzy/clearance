@@ -1,8 +1,9 @@
-
+from django.contrib.auth import authenticate, login
+from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from core.models import ClearanceRequest, Clearance, Staff, Student, Office,ProgramChair, User
+from core.models import ClearanceRequest, Clearance, Staff, Student, Office, ProgramChair, User
 from django.db.models import Count, Q
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -10,46 +11,60 @@ from core.models import Student, Clearance, Payment
 
 def home(request):
     return render(request, 'home.html')
-@login_required
-def dashboard(request):
-    """
-    Display pending clearance requests.
-    If the user is a staff member, show only requests for their office; otherwise all pending requests.
-    """
-    try:
-        staff = request.user.staff
-        clearance_requests = ClearanceRequest.objects.filter(office=staff.office, status='pending')
-    except Staff.DoesNotExist:
-        clearance_requests = ClearanceRequest.objects.filter(status='pending')
-    context = {
-        'clearance_requests': clearance_requests,
-    }
-    return render(request, 'core/dashboard.html', context)
+
+
 
 @login_required
 def update_clearance_request(request, request_id):
     """
     Allows a staff member to approve or deny a clearance request.
-    On POST, the request status is updated and the clearance (if it exists) is rechecked.
+    For dormitory clearances, ensures only the assigned dormitory owner can approve/deny.
     """
     clearance_request = get_object_or_404(ClearanceRequest, pk=request_id)
+    
+    try:
+        staff_member = request.user.staff
+        
+        # Special handling for dormitory clearances
+        if clearance_request.office.name == 'Dormitory':
+            if not staff_member.is_dormitory_owner:
+                messages.error(request, "Only dormitory owners can handle dormitory clearances.")
+                return redirect('office_dashboard')
+            if clearance_request.student.dormitory_owner != staff_member:
+                messages.error(request, "You can only handle clearances for your assigned students.")
+                return redirect('office_dashboard')
+    except Staff.DoesNotExist:
+        messages.error(request, "Staff access required.")
+        return redirect('login')
+
     if request.method == 'POST':
         new_status = request.POST.get('status')
         remarks = request.POST.get('remarks', '')
-        # If the user is linked to a Staff account, mark them as the reviewer.
+        
         try:
-            clearance_request.reviewed_by = request.user.staff
-        except Staff.DoesNotExist:
-            pass
-        clearance_request.status = new_status
-        clearance_request.remarks = remarks
-        clearance_request.reviewed_date = timezone.now()
-        clearance_request.save()
-        # Check overall clearance using the model business logic.
-        clearance = getattr(clearance_request.student, 'clearance', None)
-        if clearance:
-            clearance.check_clearance()
-        return redirect('dashboard')
+            if new_status == 'approved':
+                clearance_request.approve(staff_member)
+            elif new_status == 'denied':
+                clearance_request.deny(staff_member, remarks)
+            
+            # Check overall clearance status
+            clearance = getattr(clearance_request.student, 'clearance', None)
+            if clearance:
+                clearance.check_clearance()
+                
+            messages.success(request, f"Clearance request {new_status} successfully.")
+            
+            # Redirect based on user role after successful update
+            if hasattr(request.user, 'staff'):
+                return redirect('office_dashboard')
+            elif hasattr(request.user, 'programchair'):
+                return redirect('program_chair_dashboard')
+            else:
+                return redirect('student_dashboard')
+        except PermissionError as e:
+            messages.error(request, str(e))
+            return redirect('office_dashboard')  # Redirect to office dashboard on error
+
     context = {
         'clearance_request': clearance_request,
     }
@@ -60,106 +75,113 @@ from django.contrib.auth.decorators import login_required
 from core.models import ClearanceRequest, Clearance, Student
 @login_required
 def student_dashboard(request):
-      """
-      Display comprehensive dashboard information for student users including:
-      - Student profile details
-      - All clearance requests with their full status
-      - Final clearance status
-      - Dormitory status if applicable
-      """
-      try:
-          student = request.user.student
-      except Student.DoesNotExist:
-          return redirect('dashboard')
+    """Dashboard for students to view their clearance status."""
+    try:
+        student = request.user.student
+    except Student.DoesNotExist:
+        messages.error(request, 'You are not authorized to view this page.')
+        return redirect('login')
 
-      # Get all clearance requests with related office info
-      clearance_requests = student.clearance_requests.select_related('office', 'reviewed_by').all()
+    clearance_requests = student.clearance_requests.select_related('office', 'reviewed_by').all()
+    clearance, created = Clearance.objects.get_or_create(student=student)
     
-      # Get or create clearance record
-      clearance, created = Clearance.objects.get_or_create(student=student)
-    
-      # Check if student is a boarder and get dormitory clearance if applicable
-      dormitory_request = None
-      if student.is_boarder:
-          dormitory_request = clearance_requests.filter(office__name='Dormitory').first()
+    dormitory_request = None
+    if student.is_boarder:
+        dormitory_request = clearance_requests.filter(office__name='Dormitory').first()
 
-      context = {
-          'student': student,
-          'student_info': {
-              'full_name': student.user.get_full_name(),
-              'student_id': student.student_id,
-              'course': student.course,
-              'year_level': student.year_level,
-              'is_boarder': student.is_boarder
-          },
-          'clearance_requests': clearance_requests,
-          'clearance': clearance,
-          'dormitory_request': dormitory_request,
-          'pending_count': clearance_requests.filter(status='pending').count(),
-          'approved_count': clearance_requests.filter(status='approved').count(),
-          'denied_count': clearance_requests.filter(status='denied').count()
-      }
-      return render(request, 'core/student_dashboard.html', context)
+    context = {
+        'student': student,
+        'student_info': {
+            'full_name': student.user.get_full_name(),
+            'student_id': student.student_id,
+            'course': student.course,
+            'year_level': student.year_level,
+            'is_boarder': student.is_boarder
+        },
+        'clearance_requests': clearance_requests,
+        'clearance': clearance,
+        'dormitory_request': dormitory_request,
+        'pending_count': clearance_requests.filter(status='pending').count(),
+        'approved_count': clearance_requests.filter(status='approved').count(),
+        'denied_count': clearance_requests.filter(status='denied').count()
+    }
+    return render(request, 'core/student_dashboard.html', context)
+
 
 def register_view(request):
-    # Get all program chairs for the dropdown if needed
+    # Get all program chairs and dormitory owners for the dropdowns
     program_chairs = ProgramChair.objects.all()
+    dormitory_owners = Staff.objects.filter(is_dormitory_owner=True)
+    context = {
+        'program_chairs': program_chairs,
+        'dormitory_owners': dormitory_owners
+    }
     
     if request.method == 'POST':
         username = request.POST['username']
-    
         if User.objects.filter(username=username).exists():
             messages.error(request, 'Username already taken. Please choose another.')
-            return render(request, 'registration/register.html', {'program_chairs': program_chairs})
+            return render(request, 'registration/register.html', context)
         
-        password = request.POST['password']
-        password2 = request.POST['password2']
-        email = request.POST['email']
-        first_name = request.POST['first_name']
-        last_name = request.POST['last_name']
-        student_id = request.POST['student_id']
-        course = request.POST['course']
-        year_level = request.POST['year_level']
         is_boarder = request.POST.get('is_boarder') == 'on'
-        selected_pc_id = request.POST.get('program_chair')
-
-        if password == password2:
-            # Create User (this triggers the post_save signal which creates the Student profile automatically)
-            user = User.objects.create_user(
-                username=username,
-                password=password,
-                email=email,
-                first_name=first_name,
-                last_name=last_name
-            )
+        selected_dorm_owner_id = request.POST.get('dormitory_owner')
         
-            # Now retrieve the auto-created student profile and update it
-            student = user.student
-            student.student_id = student_id
-            student.course = course
-            student.year_level = year_level
-            student.is_boarder = is_boarder
-            student.save()
+        # Validate dormitory owner selection for boarders
+        if is_boarder and not selected_dorm_owner_id:
+            messages.error(request, 'Boarder students must select a dormitory owner.')
+            return render(request, 'registration/register.html', context)
 
-            # Create initial clearance requests if needed
-            student.create_clearance_requests()
-
-            # Auto-assign the selected Program Chair to the student if provided
-            if selected_pc_id:
-                program_chair = ProgramChair.objects.filter(id=selected_pc_id).first()
-                if program_chair:
-                    student.program_chair = program_chair
-                    student.save()
-                else:
-                    messages.error(request, "Selected Program Chair not found.")
-                    return render(request, 'registration/register.html', {'program_chairs': program_chairs})
-            
-            login(request, user)
-            return redirect('student_dashboard')
-        else:
+        if request.POST['password'] != request.POST['password2']:
             messages.error(request, 'Passwords do not match')
+            return render(request, 'registration/register.html', context)
+            
+        # Create user and student profile
+        user = User.objects.create_user(
+            username=request.POST['username'],
+            password=request.POST['password'],
+            email=request.POST['email'],
+            first_name=request.POST['first_name'],
+            last_name=request.POST['last_name']
+        )
+        
+        student = user.student
+        student.student_id = request.POST['student_id']
+        student.course = request.POST['course']
+        student.year_level = request.POST['year_level']
+        student.is_boarder = is_boarder
+        
+        # Assign program chair if provided
+        if selected_pc_id := request.POST.get('program_chair'):
+            if program_chair := ProgramChair.objects.filter(id=selected_pc_id).first():
+                student.program_chair = program_chair
+            else:
+                messages.error(request, "Selected Program Chair not found.")
+                user.delete()
+                return render(request, 'registration/register.html', context)
+        
+        # Assign dormitory owner and create payment record for boarders
+        if is_boarder and selected_dorm_owner_id:
+            if dorm_owner := Staff.objects.filter(id=selected_dorm_owner_id, is_dormitory_owner=True).first():
+                student.dormitory_owner = dorm_owner
+                student.save()
+                # Create initial payment record
+                Payment.objects.create(
+                    student=student,
+                    amount=0.00,  # Default amount, can be updated by BH owner
+                    is_paid=False
+                )
+            else:
+                messages.error(request, "Selected dormitory owner not found.")
+                user.delete()
+                return render(request, 'registration/register.html', context)
+        
+        student.save()
+        student.create_clearance_requests()
+        
+        login(request, user)
+        return redirect('student_dashboard')
     
-    return render(request, 'registration/register.html', {'program_chairs': program_chairs})
+    return render(request, 'registration/register.html', context)
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
@@ -173,26 +195,32 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-            # If the user is a Program Chair
-            if hasattr(user, 'programchair'):
-                return redirect('program_chair_dashboard')
-            # If the user is a Staff
-            elif hasattr(user, 'staff'):
-                # Check if the staff is a dormitory owner
-                if user.staff.is_dormitory_owner:
-                    return redirect('bh_owner_dashboard')
+            try:
+                # Check for staff member first
+                if hasattr(user, 'staff'):
+                    staff = user.staff
+                    if staff.is_dormitory_owner:
+                        return redirect('bh_owner_dashboard')
+                    else:
+                        return redirect('office_dashboard')
+                # Then check other user types
+                elif user.is_staff:
+                    return redirect('admin_dashboard')
+                elif hasattr(user, 'programchair'):
+                    return redirect('program_chair_dashboard')
+                elif hasattr(user, 'student'):
+                    return redirect('student_dashboard')
                 else:
-                    return redirect('office_dashboard')
-            # If the user is a Student
-            elif hasattr(user, 'student'):
-                return redirect('student_dashboard')
-            # Fallback
-            else:
+                    messages.error(request, 'Invalid user type')
+                    return redirect('login')
+            except Staff.DoesNotExist:
+                messages.error(request, 'Staff profile not found')
                 return redirect('login')
         else:
             messages.error(request, 'Invalid credentials')
 
     return render(request, 'registration/login.html')
+
 from core.models import Office, Student, ClearanceRequest
 @login_required
 def create_clearance_requests(request):
@@ -200,7 +228,7 @@ def create_clearance_requests(request):
           student = request.user.student
       except Student.DoesNotExist:
           messages.error(request, "Only students can access this page.")
-          return redirect('dashboard')
+          return redirect('student_dashboard')
 
       offices = Office.objects.all()
       # Build a dictionary mapping office.id to the student's existing clearance request (if any)
@@ -238,36 +266,48 @@ from django.contrib.auth.decorators import login_required
 from core.models import ClearanceRequest, Staff
 @login_required
 def office_dashboard(request):
-      try:
-          staff_member = request.user.staff
-      except Staff.DoesNotExist:
-          return render(request, 'core/not_authorized.html', {'message': 'You are not authorized to view this page.'})
+    """Dashboard for office staff to manage clearance requests."""
+    try:
+        staff_member = request.user.staff
+        if staff_member.is_dormitory_owner:
+            messages.error(request, 'BH owners should use the BH owner dashboard.')
+            return redirect('bh_owner_dashboard')
+    except Staff.DoesNotExist:
+        messages.error(request, 'You are not authorized to view this page.')
+        return redirect('login')
 
-      current_office = staff_member.office
-      clearance_requests = ClearanceRequest.objects.filter(office=current_office)
+    current_office = staff_member.office
+    clearance_requests = ClearanceRequest.objects.filter(office=current_office)
 
-      if request.method == 'POST':
-          request_id = request.POST.get('clearance_request_id')
-          action = request.POST.get('action')
-          cr = get_object_or_404(ClearanceRequest, id=request_id, office=current_office)
+    if request.method == 'POST':
+        request_id = request.POST.get('clearance_request_id')
+        action = request.POST.get('action')
+        cr = get_object_or_404(ClearanceRequest, id=request_id, office=current_office)
         
-          if action == 'approve':
-              cr.status = 'approved'
-          elif action == 'deny':
-              cr.status = 'denied'
-              cr.notes = request.POST.get('notes')  # Save the denial reason
+        try:
+            if action == 'approve':
+                cr.approve(staff_member)
+                messages.success(request, 'Clearance request approved successfully.')
+            elif action == 'deny':
+                notes = request.POST.get('notes', '')
+                cr.deny(staff_member, notes)
+                messages.success(request, 'Clearance request denied successfully.')
             
-          cr.reviewed_by = staff_member
-          cr.reviewed_date = timezone.now()
-          cr.save()
+            # Check overall clearance status
+            clearance = getattr(cr.student, 'clearance', None)
+            if clearance:
+                clearance.check_clearance()
+        except PermissionError as e:
+            messages.error(request, str(e))
         
-          return redirect('office_dashboard')
+        return redirect('office_dashboard')
 
-      context = {
-          'office': current_office,
-          'clearance_requests': clearance_requests,
-      }
-      return render(request, 'core/office_dashboard.html', context)
+    context = {
+        'office': current_office,
+        'clearance_requests': clearance_requests,
+    }
+    return render(request, 'core/office_dashboard.html', context)
+
 
 def clearance_requests(request):
     # Replace with actual logic to list and manage clearance requests if needed.
@@ -418,78 +458,294 @@ from core.models import Payment, Student, Staff
 
 @login_required
 def payment_dashboard(request):
-      """View for a BH (Dormitory) owner to monitor all student payments."""
-      try:
-          # Restrict view only to staff who are dormitory owners
-          staff_member = request.user.staff
-          if not staff_member.is_dormitory_owner:
-              return render(request, 'core/not_authorized.html', {
-                  'message': 'You must be a BH/Dormitory owner to view this page.'
-              })
-      except Staff.DoesNotExist:
-          return render(request, 'core/not_authorized.html', {
-              'message': 'You are not authorized to view this page.'
-          })
+    """View for a BH (Dormitory) owner to monitor their assigned students' payments."""
+    try:
+        staff_member = request.user.staff
+        if not staff_member.is_dormitory_owner:
+            messages.error(request, 'You must be a BH/Dormitory owner to view this page.')
+            return redirect('bh_owner_dashboard')
+    except Staff.DoesNotExist:
+        messages.error(request, 'You are not authorized to view this page.')
+        return redirect('login')
 
-      # List all payments or only for boarders if you want to filter
-      payments = Payment.objects.select_related('student').all()
-      context = {
-          'payments': payments
-      }
-      return render(request, 'core/payment_dashboard.html', context)
+    # Only show payments for students assigned to this BH owner
+    payments = Payment.objects.select_related('student').filter(student__dormitory_owner=staff_member)
+    context = {
+        'payments': payments
+    }
+    return render(request, 'core/payment_dashboard.html', context)
+
+
 
 
 @login_required
 def update_payment(request, payment_id):
-      """Allows BH owner to mark a payment as 'paid' or 'unpaid'."""
-      payment = get_object_or_404(Payment, pk=payment_id)
+    """Allows BH owner to mark a payment as 'paid' or 'unpaid' for their assigned students."""
+    payment = get_object_or_404(Payment, pk=payment_id)
+    
+    try:
+        staff_member = request.user.staff
+        if not staff_member.is_dormitory_owner:
+            messages.error(request, 'You must be a BH/Dormitory owner to perform this action.')
+            return redirect('bh_owner_dashboard')
+        # Check if the payment belongs to an assigned student
+        if payment.student.dormitory_owner != staff_member:
+            messages.error(request, 'You can only manage payments for your assigned students.')
+            return redirect('bh_owner_dashboard')
+    except Staff.DoesNotExist:
+        messages.error(request, 'You are not authorized to view this page.')
+        return redirect('login')
 
-      try:
-          staff_member = request.user.staff
-          if not staff_member.is_dormitory_owner:
-              return render(request, 'core/not_authorized.html', {
-                  'message': 'You must be a BH/Dormitory owner to perform this action.'
-              })
-      except Staff.DoesNotExist:
-          return render(request, 'core/not_authorized.html', {
-              'message': 'You are not authorized to view this page.'
-          })
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'paid':
+            payment.is_paid = True
+            payment.payment_date = timezone.now()
+        elif action == 'unpaid':
+            payment.is_paid = False
+            payment.payment_date = None
+        payment.save()
+        messages.success(request, 'Payment status updated successfully.')
+        return redirect('payment_dashboard')
 
-      if request.method == 'POST':
-          action = request.POST.get('action')
-          if action == 'paid':
-              payment.is_paid = True
-              payment.payment_date = timezone.now()
-          elif action == 'unpaid':
-              payment.is_paid = False
-              payment.payment_date = None
-          payment.save()
-          messages.success(request, 'Payment status updated successfully.')
-          return redirect('payment_dashboard')
+    # If not POST, redirect to payment dashboard
+    return redirect('payment_dashboard')
 
-      context = {
-          'payment': payment,
-      }
-      return render(request, 'core/update_payment.html', context)
 
 @login_required
 def bh_owner_dashboard(request):
-    """A dedicated dashboard for BH/Dormitory owners to mark payments or see statuses."""
+    """Dashboard for BH owners to manage their assigned students."""
     try:
         staff_member = request.user.staff
-        # Ensure the logged-in user is actually flagged as dormitory owner
         if not staff_member.is_dormitory_owner:
-            return render(request, 'core/not_authorized.html', {
-                'message': 'You must be a BH (dormitory) owner to view this page.'
-            })
+            messages.error(request, 'You must be a BH owner to view this page.')
+            return redirect('office_dashboard')
     except Staff.DoesNotExist:
-        return render(request, 'core/not_authorized.html', {
-            'message': 'You are not authorized to view this page.'
-        })
+        messages.error(request, 'You are not authorized to view this page.')
+        return redirect('login')
 
-    # Example: retrieve Payment objects or clearance requests, filtered if needed
-    payments = Payment.objects.select_related('student').all()  # or filter only boarders
+    # Filter clearance requests to only include those assigned to the current BH owner
+    clearance_requests = ClearanceRequest.objects.filter(
+        student__dormitory_owner=staff_member,
+        office__name='Dormitory'
+    ).select_related('student')
+    
+    payments = Payment.objects.filter(student__dormitory_owner=staff_member)
+    
     context = {
+        'clearance_requests': clearance_requests,
         'payments': payments,
     }
     return render(request, 'core/bh_owner_dashboard.html', context)
+
+
+
+@login_required
+def admin_dashboard(request):
+    """Admin dashboard view for managing users and system data."""
+    if not request.user.is_staff:
+        messages.error(request, 'You are not authorized to access the admin dashboard.')
+        return redirect('login')
+
+    context = {
+        'total_students': Student.objects.count(),
+        'total_staff': Staff.objects.count(),
+        'total_program_chairs': ProgramChair.objects.count(),
+        'total_offices': Office.objects.count(),
+        'recent_students': Student.objects.select_related('user', 'program_chair').order_by('-created_at')[:5],
+        'recent_clearances': Clearance.objects.select_related('student').order_by('-cleared_date')[:5],
+        'clearance_stats': {
+            'pending': ClearanceRequest.objects.filter(status='pending').count(),
+            'approved': ClearanceRequest.objects.filter(status='approved').count(),
+            'denied': ClearanceRequest.objects.filter(status='denied').count(),
+        },
+        'offices': Office.objects.annotate(
+            staff_count=Count('staff'),
+            pending_requests=Count('clearance_requests', filter=Q(clearance_requests__status='pending'))
+        )
+    }
+    return render(request, 'admin/dashboard.html', context)
+
+@login_required
+def admin_users(request):
+    """Admin view for managing users."""
+    if not request.user.is_staff:
+        messages.error(request, 'You are not authorized to access the admin dashboard.')
+        return redirect('login')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        user_id = request.POST.get('user_id')
+
+        if action == 'delete':
+            user = get_object_or_404(User, id=user_id)
+            user.delete()
+            messages.success(request, f'User {user.username} deleted successfully.')
+            return redirect('admin_users')
+
+    context = {
+        'students': Student.objects.select_related('user', 'program_chair').all(),
+        'staff': Staff.objects.select_related('user', 'office').all(),
+        'program_chairs': ProgramChair.objects.select_related('user').all(),
+        'offices': Office.objects.all(),  # For staff creation
+    }
+    return render(request, 'admin/users.html', context)
+
+@login_required
+def admin_create_user(request):
+    """Admin view for creating users."""
+    if not request.user.is_staff:
+        messages.error(request, 'You are not authorized to access the admin dashboard.')
+        return redirect('login')
+
+    if request.method == 'POST':
+        user_type = request.POST.get('user_type')
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        email = request.POST.get('email')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+
+        try:
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                email=email,
+                first_name=first_name,
+                last_name=last_name
+            )
+
+            if user_type == 'student':
+                Student.objects.create(
+                    user=user,
+                    student_id=request.POST.get('student_id'),
+                    course=request.POST.get('course'),
+                    year_level=int(request.POST.get('year_level')),
+                    program_chair_id=request.POST.get('program_chair')
+                )
+            elif user_type == 'staff':
+                Staff.objects.create(
+                    user=user,
+                    office_id=request.POST.get('office'),
+                    role=request.POST.get('role'),
+                    is_dormitory_owner=request.POST.get('is_dormitory_owner') == 'on'
+                )
+            elif user_type == 'program_chair':
+                ProgramChair.objects.create(
+                    user=user,
+                    designation=request.POST.get('designation')
+                )
+
+            messages.success(request, f'{user_type.title()} created successfully.')
+            return redirect('admin_users')
+        except Exception as e:
+            messages.error(request, f'Error creating user: {str(e)}')
+            return redirect('admin_create_user')
+
+    context = {
+        'offices': Office.objects.all(),
+        'program_chairs': ProgramChair.objects.all(),
+    }
+    return render(request, 'admin/create_user.html', context)
+
+@login_required
+def admin_edit_user(request, user_id):
+    """Admin view for editing users."""
+    if not request.user.is_staff:
+        messages.error(request, 'You are not authorized to access the admin dashboard.')
+        return redirect('login')
+
+    user = get_object_or_404(User, id=user_id)
+    user_type = 'student' if hasattr(user, 'student') else 'staff' if hasattr(user, 'staff') else 'program_chair'
+
+    if request.method == 'POST':
+        try:
+            user.username = request.POST.get('username')
+            user.email = request.POST.get('email')
+            user.first_name = request.POST.get('first_name')
+            user.last_name = request.POST.get('last_name')
+            if request.POST.get('password'):
+                user.set_password(request.POST.get('password'))
+            user.save()
+
+            if user_type == 'student':
+                student = user.student
+                student.student_id = request.POST.get('student_id')
+                student.course = request.POST.get('course')
+                student.year_level = int(request.POST.get('year_level'))
+                student.program_chair_id = request.POST.get('program_chair')
+                student.save()
+            elif user_type == 'staff':
+                staff = user.staff
+                staff.office_id = request.POST.get('office')
+                staff.role = request.POST.get('role')
+                staff.is_dormitory_owner = request.POST.get('is_dormitory_owner') == 'on'
+                staff.save()
+            elif user_type == 'program_chair':
+                program_chair = user.programchair
+                program_chair.designation = request.POST.get('designation')
+                program_chair.save()
+
+            messages.success(request, f'User updated successfully.')
+            return redirect('admin_users')
+        except Exception as e:
+            messages.error(request, f'Error updating user: {str(e)}')
+
+    context = {
+        'user_obj': user,
+        'user_type': user_type,
+        'offices': Office.objects.all(),
+        'program_chairs': ProgramChair.objects.all(),
+    }
+    return render(request, 'admin/edit_user.html', context)
+
+@login_required
+def admin_offices(request):
+    """Admin view for managing offices."""
+    if not request.user.is_staff:
+        messages.error(request, 'You are not authorized to access the admin dashboard.')
+        return redirect('login')
+
+    offices = Office.objects.annotate(
+        staff_count=Count('staff'),
+        total_requests=Count('clearance_requests'),
+        pending_requests=Count('clearance_requests', filter=Q(clearance_requests__status='pending'))
+    )
+    total_staff = sum(office.staff_count for office in offices)
+    total_pending = sum(office.pending_requests for office in offices)
+    
+    context = {
+        'offices': offices,
+        'total_staff': total_staff,
+        'total_pending': total_pending,
+    }
+    return render(request, 'admin/offices.html', context)
+
+@login_required
+def admin_clearances(request):
+    """Admin view for monitoring clearance requests."""
+    if not request.user.is_staff:
+        messages.error(request, 'You are not authorized to access the admin dashboard.')
+        return redirect('login')
+
+    clearance_requests = ClearanceRequest.objects.select_related(
+        'student', 'office', 'reviewed_by'
+    ).order_by('-request_date')
+
+    pending_count = clearance_requests.filter(status='pending').count()
+    approved_count = clearance_requests.filter(status='approved').count()
+    denied_count = clearance_requests.filter(status='denied').count()
+
+    clearances = Clearance.objects.select_related('student').all()
+
+    context = {
+        'clearance_requests': clearance_requests,
+        'clearances': clearances,
+        'pending_count': pending_count,
+        'approved_count': approved_count,
+        'denied_count': denied_count,
+    }
+    return render(request, 'admin/clearances.html', context)
+
+
+

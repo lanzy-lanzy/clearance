@@ -2,13 +2,32 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
 import random
-from core.models import Office, Staff, Student, ClearanceRequest, Clearance, ProgramChair
+from core.models import Office, Staff, Student, ClearanceRequest, Clearance, ProgramChair, Payment
 
 class Command(BaseCommand):
     help = 'Populate database with initial sample data including offices, staff, students, and program chair assignments'
 
     def handle(self, *args, **kwargs):
-        # -------------------------
+        self.stdout.write(self.style.SUCCESS("\nCreating Admin User..."))
+        # Create superuser/admin account
+        admin_user, created = User.objects.get_or_create(
+            username="admin",
+            defaults={
+                "email": "admin@example.com",
+                "is_staff": True,
+                "is_superuser": True,
+                "first_name": "Admin",
+                "last_name": "User"
+            }
+        )
+        if created:
+            admin_user.set_password("admin123")
+            admin_user.save()
+            self.stdout.write(self.style.SUCCESS("Created admin user"))
+        else:
+            self.stdout.write(self.style.WARNING("Admin user already exists"))
+
+        self.stdout.write(self.style.SUCCESS("\nCreating Offices..."))
         # Create required offices (DSA updated)
         offices_data = [
             {"name": "SET", "description": "School of Engineering and Technology"},
@@ -17,9 +36,23 @@ class Command(BaseCommand):
             {"name": "Library Office", "description": "Manages library resources and clearances"},
             {"name": "Laboratory In-charge", "description": "Oversees laboratory clearances and safety"},
             {"name": "Accounting Office", "description": "Handles student financial clearances"},
-            {"name": "Registrar's Office", "description": "Manages academic records and clearances"},
-            {"name": "BH In-charge", "description": "Handles boarding house clearances"}
+            {"name": "Registrar's Office", "description": "Manages academic records and clearances"}
         ]
+
+
+        # Create Dormitory Office first
+        dormitory_office, created = Office.objects.get_or_create(
+            name="Dormitory",
+            defaults={"description": "Handles boarding house clearances"}
+        )
+        if created:
+            self.stdout.write(self.style.SUCCESS(f"Created Dormitory Office"))
+        else:
+            self.stdout.write(self.style.WARNING(f"Dormitory Office already exists"))
+
+        # Remove Dormitory office from the general offices list if it exists
+        offices_data = [office for office in offices_data if office["name"] != "Dormitory"]
+
         for office_info in offices_data:
             office, created = Office.objects.get_or_create(
                 name=office_info["name"],
@@ -30,7 +63,57 @@ class Command(BaseCommand):
                 else self.style.WARNING(f"Office exists: {office.name}")
             )
 
-        # -------------------------
+
+
+
+        self.stdout.write(self.style.SUCCESS("\nCreating BH Owners..."))
+        # Create multiple BH owners
+        bh_owners_data = [
+            {
+                "username": "bh_owner1",
+                "first_name": "John",
+                "last_name": "Smith",
+                "email": "john.smith@bh.com",
+                "role": "BH Owner 1"
+            },
+            {
+                "username": "bh_owner2",
+                "first_name": "Mary",
+                "last_name": "Johnson",
+                "email": "mary.johnson@bh.com",
+                "role": "BH Owner 2"
+            }
+        ]
+
+        bh_owners = []
+        for owner_data in bh_owners_data:
+            user, created = User.objects.get_or_create(
+                username=owner_data["username"],
+                defaults={
+                    "first_name": owner_data["first_name"],
+                    "last_name": owner_data["last_name"],
+                    "email": owner_data["email"]
+                }
+            )
+            if created:
+                user.set_password("bhowner123")
+                user.save()
+
+            staff, created = Staff.objects.get_or_create(
+                user=user,
+                defaults={
+                    "office": dormitory_office,
+                    "role": owner_data["role"],
+                    "is_dormitory_owner": True
+                }
+            )
+            bh_owners.append(staff)
+            self.stdout.write(
+                self.style.SUCCESS(f"Created BH Owner: {staff.user.get_full_name()}")
+                if created else self.style.WARNING(f"BH Owner exists: {staff.user.get_full_name()}")
+            )
+
+        self.stdout.write(self.style.SUCCESS("\nCreating Staff Members..."))
         # Create staff members for each updated office
         staff_data = [
             {"username": "ssc_staff", "office_name": "SET", "role": "SET Officer"},
@@ -39,8 +122,7 @@ class Command(BaseCommand):
             {"username": "library_staff", "office_name": "Library Office", "role": "Librarian"},
             {"username": "lab_incharge", "office_name": "Laboratory In-charge", "role": "Lab In-charge"},
             {"username": "accounting_staff", "office_name": "Accounting Office", "role": "Accounting Officer"},
-            {"username": "registrar_staff", "office_name": "Registrar's Office", "role": "Registrar"},
-            {"username": "bh_incharge", "office_name": "BH In-charge", "role": "Boarding House Manager", "is_dormitory_owner": True}
+            {"username": "registrar_staff", "office_name": "Registrar's Office", "role": "Registrar"}
         ]
         for staff_info in staff_data:
             # Create or get user account
@@ -72,7 +154,7 @@ class Command(BaseCommand):
                 if created else self.style.WARNING(f"Staff exists: {staff.user.username}")
             )
 
-        # -------------------------
+        self.stdout.write(self.style.SUCCESS("\nCreating Program Chairs..."))
         # Create multiple ProgramChair (dean) users with designations
         program_chair_data = [
             {
@@ -161,88 +243,104 @@ class Command(BaseCommand):
                 if created else self.style.WARNING(f"Program Chair exists: {pc.user.username}")
             )
 
-        # -------------------------
-        # Create sample students and assign them a designated Program Chair (dean)
-        students_data = [
+        self.stdout.write(self.style.SUCCESS("\nCreating Boarder Students..."))
+        # Create boarder students with assignments to BH owners
+        boarder_students_data = [
             {
-                "username": "student1",
+                "username": "boarder1",
                 "password": "student123",
-                "first_name": "John",
-                "last_name": "Doe",
-                "email": "john.doe@student.edu",
-                "student_id": "2023-0001",
+                "first_name": "Alice",
+                "last_name": "Brown",
+                "email": "alice.brown@student.edu",
+                "student_id": "2023-B001",
                 "course": "Computer Science",
-                "year_level": 3,
-                "is_boarder": True
-            },
-            {
-                "username": "student2",
-                "password": "student123",
-                "first_name": "Jane",
-                "last_name": "Smith",
-                "email": "jane.smith@student.edu",
-                "student_id": "2023-0002",
-                "course": "Engineering",
                 "year_level": 2,
-                "is_boarder": False
+                "bh_owner": bh_owners[0],  # Assign to first BH owner
+                "payment_amount": 5000.00
             },
             {
-                "username": "student3",
+                "username": "boarder2",
                 "password": "student123",
-                "first_name": "Mike",
-                "last_name": "Johnson",
-                "email": "mike.johnson@student.edu",
-                "student_id": "2023-0003",
-                "course": "Business Administration",
-                "year_level": 4,
-                "is_boarder": True
+                "first_name": "Bob",
+                "last_name": "Wilson",
+                "email": "bob.wilson@student.edu",
+                "student_id": "2023-B002",
+                "course": "Engineering",
+                "year_level": 3,
+                "bh_owner": bh_owners[0],  # Assign to first BH owner
+                "payment_amount": 4500.00
+            },
+            {
+                "username": "boarder3",
+                "password": "student123",
+                "first_name": "Carol",
+                "last_name": "Davis",
+                "email": "carol.davis@student.edu",
+                "student_id": "2023-B003",
+                "course": "Business",
+                "year_level": 2,
+                "bh_owner": bh_owners[1],  # Assign to second BH owner
+                "payment_amount": 5500.00
             }
         ]
         # Define a mapping between student usernames and the designated program chair usernames.
         designated_pc = {
-            "student1": "pc_set",
-            "student2": "pc_ste",
-            "student3": "pc_socje"
+            "boarder1": "pc_set",
+            "boarder2": "pc_ste",
+            "boarder3": "pc_socje"
         }
-        for idx, student_info in enumerate(students_data):
-            # Create or get user account for the student
+        # Create boarder students
+        for student_data in boarder_students_data:
+            # Create user account
             user, created = User.objects.get_or_create(
-                username=student_info["username"],
+                username=student_data["username"],
                 defaults={
-                    "first_name": student_info["first_name"],
-                    "last_name": student_info["last_name"],
-                    "email": student_info["email"]
+                    "first_name": student_data["first_name"],
+                    "last_name": student_data["last_name"],
+                    "email": student_data["email"]
                 }
             )
             if created:
-                user.set_password(student_info["password"])
+                user.set_password("password")  # Changed password to 'password'
                 user.save()
 
-            # Create or get student record
+            # Create student profile
             student, created = Student.objects.get_or_create(
                 user=user,
                 defaults={
-                    "student_id": student_info["student_id"],
-                    "course": student_info["course"],
-                    "year_level": student_info["year_level"],
-                    "is_boarder": student_info["is_boarder"]
+                    "student_id": student_data["student_id"],
+                    "course": student_data["course"],
+                    "year_level": student_data["year_level"],
+                    "is_boarder": True,
+                    "dormitory_owner": student_data["bh_owner"]
                 }
             )
+
             if created:
-                # Create clearance requests for the student (using the model method)
+                # Create clearance requests
                 student.create_clearance_requests()
-                # Create an initial final clearance record if not present
+                
+                # Create payment record
+                Payment.objects.create(
+                    student=student,
+                    amount=student_data["payment_amount"],
+                    is_paid=False
+                )
+
+                # Create clearance record
                 Clearance.objects.get_or_create(student=student)
+
                 self.stdout.write(self.style.SUCCESS(
-                    f"Created student: {student.user.get_full_name()} ({student.student_id})"
+                    f"Created boarder student: {student.full_name} ({student.student_id}) "
+                    f"assigned to BH Owner: {student_data['bh_owner'].user.get_full_name()}"
                 ))
             else:
                 self.stdout.write(self.style.WARNING(
-                    f"Student exists: {student.user.get_full_name()} ({student.student_id})"
+                    f"Boarder student exists: {student.full_name} ({student.student_id})"
                 ))
-            # -------------------------
-            # Assign a designated Program Chair to the student based on the mapping above.
-            pc_username = designated_pc.get(student_info["username"])
+
+            # Assign program chair if mapping exists
+            pc_username = designated_pc.get(student_data["username"])
             if pc_username:
                 assigned_pc = ProgramChair.objects.filter(user__username=pc_username).first()
                 if assigned_pc:
@@ -251,26 +349,26 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(
                         f"Assigned Program Chair {assigned_pc.user.get_full_name()} ({assigned_pc.designation}) to student: {student.student_id}"
                     ))
-                else:
-                    self.stdout.write(self.style.ERROR(
-                        f"Program Chair with username '{pc_username}' not found for student: {student.student_id}"
+
+
+        self.stdout.write(self.style.SUCCESS("\nSetting up Clearance Requests..."))
+        # Create some sample clearance request statuses
+        for student in Student.objects.filter(is_boarder=True):
+            dormitory_request = ClearanceRequest.objects.filter(
+                student=student,
+                office__name="Dormitory"
+            ).first()
+            
+            if dormitory_request:
+                # Randomly set some clearance requests as approved/denied
+                status = random.choice(['pending', 'approved', 'denied'])
+                if status != 'pending':
+                    if status == 'approved':
+                        dormitory_request.approve(student.dormitory_owner)
+                    else:
+                        dormitory_request.deny(student.dormitory_owner, "Sample denial reason")
+                    self.stdout.write(self.style.SUCCESS(
+                        f"Set clearance request for {student.full_name} to {status}"
                     ))
-            else:
-                self.stdout.write(self.style.WARNING(
-                    f"No designated Program Chair mapping for student: {student.student_id}"
-                ))
 
-        # -------------------------
-        # For demonstration purposes: Unlock permit for student1 if cleared
-        try:
-            student = Student.objects.get(user__username="student1")
-            clearance, created = Clearance.objects.get_or_create(student=student)
-            # Simulate that this student's clearance has been verified
-            clearance.is_cleared = True
-            clearance.cleared_date = timezone.now()
-            clearance.unlock_permit()  # This sets program_chair_approved to True if is_cleared is True
-            self.stdout.write(self.style.SUCCESS(f"Permit unlocked for student: {student.student_id}"))
-        except Student.DoesNotExist:
-            self.stdout.write(self.style.ERROR("Student with username 'student1' does not exist."))
-
-        self.stdout.write(self.style.SUCCESS("Successfully populated offices, staff, students, and program chair data"))
+        self.stdout.write(self.style.SUCCESS("\nData population completed successfully!"))

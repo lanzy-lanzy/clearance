@@ -1,0 +1,137 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block admin_content %}
+<div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+	<h2 class="text-2xl font-bold text-gray-800 mb-6">Create New User</h2>
+	
+	<form method="POST" class="space-y-6">
+		{% csrf_token %}
+		
+		<!-- User Type Selection -->
+		<div>
+			<label class="block text-sm font-medium text-gray-700 mb-2">User Type</label>
+			<select name="user_type" id="user_type" class="w-full px-3 py-2 border border-gray-300 rounded-md" onchange="toggleFields()">
+				<option value="student">Student</option>
+				<option value="staff">Staff</option>
+				<option value="program_chair">Program Chair</option>
+			</select>
+		</div>
+
+		<!-- Basic User Information -->
+		<div class="grid grid-cols-2 gap-4">
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+				<input type="text" name="username" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
+			</div>
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+				<input type="password" name="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
+			</div>
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+				<input type="text" name="first_name" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
+			</div>
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+				<input type="text" name="last_name" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
+			</div>
+			<div class="col-span-2">
+				<label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+				<input type="email" name="email" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
+			</div>
+		</div>
+
+		<!-- Student Fields -->
+		<div id="student_fields" class="space-y-4">
+			<div class="grid grid-cols-2 gap-4">
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
+					<input type="text" name="student_id" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
+					<input type="number" name="year_level" min="1" max="5" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+				</div>
+			</div>
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Course</label>
+				<input type="text" name="course" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+			</div>
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Program Chair</label>
+				<select name="program_chair" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+					<option value="">Select Program Chair</option>
+					{% for pc in program_chairs %}
+					<option value="{{ pc.id }}">{{ pc.user.get_full_name }} - {{ pc.designation }}</option>
+					{% endfor %}
+				</select>
+			</div>
+		</div>
+
+		<!-- Staff Fields -->
+		<div id="staff_fields" class="space-y-4 hidden">
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Office</label>
+				<select name="office" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+					<option value="">Select Office</option>
+					{% for office in offices %}
+					<option value="{{ office.id }}">{{ office.name }}</option>
+					{% endfor %}
+				</select>
+			</div>
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+				<input type="text" name="role" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+			</div>
+			<div class="flex items-center">
+				<input type="checkbox" name="is_dormitory_owner" id="is_dormitory_owner" class="h-4 w-4 text-emerald-600 border-gray-300 rounded">
+				<label for="is_dormitory_owner" class="ml-2 block text-sm text-gray-700">Is Dormitory Owner</label>
+			</div>
+		</div>
+
+		<!-- Program Chair Fields -->
+		<div id="program_chair_fields" class="space-y-4 hidden">
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-2">Designation</label>
+				<select name="designation" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+					<option value="">Select Designation</option>
+					<option value="SET DEAN">SET DEAN</option>
+					<option value="STE DEAN">STE DEAN</option>
+					<option value="SOCJE DEAN">SOCJE DEAN</option>
+					<option value="SAFES DEAN">SAFES DEAN</option>
+					<option value="SSB SET">SSB SET</option>
+					<option value="SSB STE">SSB STE</option>
+					<option value="SSB SOCJE">SSB SOCJE</option>
+					<option value="SSB SAFES">SSB SAFES</option>
+				</select>
+			</div>
+		</div>
+
+		<div class="flex justify-end space-x-4">
+			<a href="{% url 'admin_users' %}" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</a>
+			<button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">Create User</button>
+		</div>
+	</form>
+</div>
+
+<script>
+function toggleFields() {
+	const userType = document.getElementById('user_type').value;
+	const studentFields = document.getElementById('student_fields');
+	const staffFields = document.getElementById('staff_fields');
+	const programChairFields = document.getElementById('program_chair_fields');
+
+	studentFields.classList.add('hidden');
+	staffFields.classList.add('hidden');
+	programChairFields.classList.add('hidden');
+
+	if (userType === 'student') {
+		studentFields.classList.remove('hidden');
+	} else if (userType === 'staff') {
+		staffFields.classList.remove('hidden');
+	} else if (userType === 'program_chair') {
+		programChairFields.classList.remove('hidden');
+	}
+}
+</script>
+{% endblock %}
