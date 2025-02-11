@@ -124,17 +124,9 @@ class Student(models.Model):
                 ClearanceRequest.objects.get_or_create(student=self, office=office)
 @receiver(post_save, sender=User)
 def create_student_profile(sender, instance, created, **kwargs):
-    # Only create a student profile automatically if the user is not staff/programchair
-    if created and not instance.is_staff and not hasattr(instance, 'programchair'):
-        # Only auto-create if no student profile exists
-        if not hasattr(instance, 'student'):
-            Student.objects.create(
-                user=instance,
-                student_id=f"UID{instance.id}",
-                course="Undeclared",
-                year_level=1,
-                is_boarder=False
-            )
+    # Remove automatic student creation since we'll handle it in the view
+    pass
+
 class ClearanceRequest(models.Model):
     """Represents clearance requests for students dynamically per office."""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='clearance_requests')

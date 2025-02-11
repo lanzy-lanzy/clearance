@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}Manage Students{% endblock %}
+
+{% block sidebar %}
+{% include 'components/program_chair_sidenav.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6">
+	<div class="mb-8">
+		<h1 class="text-4xl font-bold text-emerald-900">Manage Students</h1>
+		<p class="text-emerald-600 mt-2">Comprehensive student management and monitoring system.</p>
+	</div>
+
+	<!-- Search and Filter Section -->
+	<div class="bg-white rounded-xl shadow-lg p-6 mb-8 border border-emerald-100">
+		<form method="GET" class="space-y-4">
+			<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+				<div>
+					<label class="block text-sm font-medium text-emerald-700 mb-1">Search</label>
+					<input type="text" name="search" placeholder="Name or Student ID" 
+						   value="{{ search_query }}"
+						   class="w-full border border-emerald-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-emerald-700 mb-1">Course</label>
+					<select name="course" class="w-full border border-emerald-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+						<option value="">All Courses</option>
+						{% for course in courses %}
+						<option value="{{ course }}" {% if selected_course == course %}selected{% endif %}>{{ course }}</option>
+						{% endfor %}
+					</select>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-emerald-700 mb-1">Year Level</label>
+					<select name="year_level" class="w-full border border-emerald-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+						<option value="">All Years</option>
+						{% for year in year_levels %}
+						<option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+						{% endfor %}
+					</select>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-emerald-700 mb-1">Clearance Status</label>
+					<select name="clearance_status" class="w-full border border-emerald-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+						<option value="">All Status</option>
+						<option value="cleared" {% if selected_status == 'cleared' %}selected{% endif %}>Cleared</option>
+						<option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+					</select>
+				</div>
+			</div>
+			<div class="flex justify-end">
+				<button type="submit" class="bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-colors duration-200">
+					Apply Filters
+				</button>
+			</div>
+		</form>
+	</div>
+
+	<!-- Students Table -->
+	<div class="bg-white rounded-xl shadow-lg p-6 border border-emerald-100">
+		<div class="overflow-x-auto">
+			<table class="min-w-full">
+				<thead class="bg-emerald-50">
+					<tr>
+						<th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Student</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Course</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Year Level</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Clearance Status</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Actions</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-emerald-100">
+					{% for student in page_obj %}
+					<tr class="hover:bg-emerald-50 transition-colors duration-200">
+						<td class="px-4 py-3">
+							<div class="flex items-center">
+								<div>
+									<div class="font-medium text-emerald-900">{{ student.user.get_full_name }}</div>
+									<div class="text-sm text-emerald-600">{{ student.student_id }}</div>
+								</div>
+							</div>
+						</td>
+						<td class="px-4 py-3 text-emerald-800">{{ student.course }}</td>
+						<td class="px-4 py-3 text-emerald-800">{{ student.year_level }}</td>
+						<td class="px-4 py-3">
+							{% if student.clearance.is_cleared %}
+							<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+								Cleared
+							</span>
+							{% else %}
+							<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+								Pending
+							</span>
+							{% endif %}
+						</td>
+						<td class="px-4 py-3">
+							<div class="flex items-center space-x-2">
+								<a href="{% url 'student_detail' student.id %}" 
+								   class="text-emerald-600 hover:text-emerald-800">
+									View Details
+								</a>
+							</div>
+						</td>
+					</tr>
+					{% empty %}
+					<tr>
+						<td colspan="5" class="px-4 py-3 text-center text-emerald-600 italic">
+							No students found matching the criteria.
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+
+		<!-- Pagination -->
+		{% if page_obj.has_other_pages %}
+		<div class="flex items-center justify-center space-x-1 mt-6">
+			{% if page_obj.has_previous %}
+			<a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_course %}&course={{ selected_course }}{% endif %}{% if selected_year %}&year_level={{ selected_year }}{% endif %}{% if selected_status %}&clearance_status={{ selected_status }}{% endif %}" 
+			   class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
+				Previous
+			</a>
+			{% endif %}
+
+			{% for num in page_obj.paginator.page_range %}
+			{% if page_obj.number == num %}
+			<span class="px-4 py-2 text-white bg-emerald-500 border border-emerald-500 rounded-lg">{{ num }}</span>
+			{% else %}
+			<a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_course %}&course={{ selected_course }}{% endif %}{% if selected_year %}&year_level={{ selected_year }}{% endif %}{% if selected_status %}&clearance_status={{ selected_status }}{% endif %}" 
+			   class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
+				{{ num }}
+			</a>
+			{% endif %}
+			{% endfor %}
+
+			{% if page_obj.has_next %}
+			<a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_course %}&course={{ selected_course }}{% endif %}{% if selected_year %}&year_level={{ selected_year }}{% endif %}{% if selected_status %}&clearance_status={{ selected_status }}{% endif %}" 
+			   class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
+				Next
+			</a>
+			{% endif %}
+		</div>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}

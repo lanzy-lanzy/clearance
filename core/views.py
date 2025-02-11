@@ -3,11 +3,30 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from core.models import ClearanceRequest, Clearance, Staff, Student, Office, ProgramChair, User
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from core.models import Student, Clearance, Payment
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from datetime import datetime
+
+# PDF Generation
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+
+# Excel Generation
+from openpyxl import Workbook
+
+# Local imports
+from core.models import (
+    ClearanceRequest, Clearance, Staff, Student, 
+    Office, ProgramChair, User, Payment
+)
+
 
 def home(request):
     return render(request, 'home.html')
@@ -109,34 +128,34 @@ def student_dashboard(request):
 
 
 def register_view(request):
-    # Get all program chairs and dormitory owners for the dropdowns
-    program_chairs = ProgramChair.objects.filter(designation__in=[
-        'SET DEAN', 'STE DEAN', 'SOCJE DEAN', 'SAFES DEAN'
-    ])
-    dormitory_owners = Staff.objects.filter(is_dormitory_owner=True)
-    
-    context = {
-        'program_chairs': program_chairs,
-        'dormitory_owners': dormitory_owners
-    }
-    
     if request.method == 'POST':
-        username = request.POST['username']
-        if User.objects.filter(username=username).exists():
-            messages.error(request, 'Username already taken. Please choose another.')
-            return render(request, 'registration/register.html', context)
-        
-        # Validate password match
-        if request.POST['password'] != request.POST['password2']:
-            messages.error(request, 'Passwords do not match')
-            return render(request, 'registration/register.html', context)
+        # Get form data
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        password2 = request.POST.get('password2')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        student_id = request.POST.get('student_id')
+        course = request.POST.get('course')
+        year_level = request.POST.get('year_level')
+        program_chair_id = request.POST.get('program_chair')
+        is_boarder = request.POST.get('is_boarder') == 'on'
+        dormitory_owner_id = request.POST.get('dormitory_owner')
 
-        # Validate course selection based on selected dean
-        selected_dean_id = request.POST.get('program_chair')
-        selected_course = request.POST.get('course')
-        
+        # Validate username
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Username already taken!")
+            return redirect('register')
+
+        # Validate passwords match
+        if password != password2:
+            messages.error(request, "Passwords do not match!")
+            return redirect('register')
+
         try:
-            program_chair = ProgramChair.objects.get(id=selected_dean_id)
+            # Validate course selection based on selected dean
+            program_chair = ProgramChair.objects.get(id=program_chair_id)
             valid_courses = {
                 'SET DEAN': ['BSIT'],
                 'STE DEAN': ['BPED', 'BEED', 'BSED', 'BAELS', 'BSMATH'],
@@ -144,67 +163,82 @@ def register_view(request):
                 'SAFES DEAN': ['BSA', 'BSAES', 'BCF']
             }
             
-            if selected_course not in valid_courses.get(program_chair.designation, []):
+            if course not in valid_courses.get(program_chair.designation, []):
                 messages.error(request, 'Invalid course selection for the chosen school')
-                return render(request, 'registration/register.html', context)
-        except ProgramChair.DoesNotExist:
-            messages.error(request, "Selected Program Chair not found.")
-            return render(request, 'registration/register.html', context)
-            
-        # Create user and student profile
-        user = User.objects.create_user(
-            username=request.POST['username'],
-            password=request.POST['password'],
-            email=request.POST['email'],
-            first_name=request.POST['first_name'],
-            last_name=request.POST['last_name']
-        )
-        
-        # Handle dormitory assignment
-        is_boarder = request.POST.get('is_boarder') == 'on'
-        selected_dorm_owner_id = request.POST.get('dormitory_owner')
-        
-        if is_boarder and not selected_dorm_owner_id:
-            messages.error(request, 'Boarder students must select a dormitory owner.')
-            user.delete()
-            return render(request, 'registration/register.html', context)
+                return redirect('register')
 
-        # Create or update student profile
-        student = Student.objects.create(
-            user=user,
-            student_id=request.POST['student_id'],
-            course=selected_course,
-            year_level=int(request.POST['year_level']),
-            is_boarder=is_boarder,
-            program_chair=program_chair
-        )
-        
-        # Assign dormitory owner if student is a boarder
-        if is_boarder and selected_dorm_owner_id:
-            try:
-                dorm_owner = Staff.objects.get(id=selected_dorm_owner_id, is_dormitory_owner=True)
-                student.dormitory_owner = dorm_owner
-                student.save()
-                
-                # Create initial payment record for boarders
-                Payment.objects.create(
-                    student=student,
-                    amount=0.00,
-                    is_paid=False
-                )
-            except Staff.DoesNotExist:
-                messages.error(request, "Selected dormitory owner not found.")
+            # Validate dormitory owner selection
+            if is_boarder and not dormitory_owner_id:
+                messages.error(request, "Boarder students must select a dormitory owner!")
+                return redirect('register')
+
+            # Create user
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name
+            )
+
+            # Create student profile with program chair assignment
+            student = Student.objects.create(
+                user=user,
+                student_id=student_id,
+                course=course,
+                year_level=int(year_level),
+                is_boarder=is_boarder,
+                program_chair_id=program_chair_id  # Assign program chair using ID
+            )
+
+            # If student is a boarder and dormitory owner is selected, assign it
+            if is_boarder and dormitory_owner_id:
+                try:
+                    dorm_owner = Staff.objects.get(id=dormitory_owner_id, is_dormitory_owner=True)
+                    student.dormitory_owner = dorm_owner
+                    student.save()
+                    
+                    # Create initial payment record for boarders
+                    Payment.objects.create(
+                        student=student,
+                        amount=0.00,
+                        is_paid=False
+                    )
+                except Staff.DoesNotExist:
+                    user.delete()
+                    messages.error(request, "Selected dormitory owner not found!")
+                    return redirect('register')
+
+            # Create clearance requests for the student
+            student.create_clearance_requests()
+            
+            # Create clearance record
+            Clearance.objects.create(student=student)
+
+            # Login the user
+            login(request, user)
+            messages.success(request, "Registration successful! Welcome to the clearance system.")
+            return redirect('student_dashboard')
+
+        except IntegrityError:
+            messages.error(request, "Registration failed. Please try again with different information.")
+            return redirect('register')
+        except Exception as e:
+            if 'user' in locals():
                 user.delete()
-                return render(request, 'registration/register.html', context)
-        
-        # Create clearance requests for the student
-        student.create_clearance_requests()
-        
-        # Log the user in and redirect to dashboard
-        login(request, user)
-        return redirect('student_dashboard')
+            messages.error(request, f"Registration failed: {str(e)}")
+            return redirect('register')
+
+    # If GET request, show the registration form
+    program_chairs = ProgramChair.objects.filter(designation__in=[
+        'SET DEAN', 'STE DEAN', 'SOCJE DEAN', 'SAFES DEAN'
+    ])
+    dormitory_owners = Staff.objects.filter(is_dormitory_owner=True)
     
-    return render(request, 'registration/register.html', context)
+    return render(request, 'registration/register.html', {
+        'program_chairs': program_chairs,
+        'dormitory_owners': dormitory_owners,
+    })
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
@@ -292,7 +326,6 @@ def office_dashboard(request):
     """Dashboard for office staff to manage clearance requests."""
     try:
         staff_member = request.user.staff
-        # Check if user is a BH owner and redirect them
         if staff_member.is_dormitory_owner:
             return redirect('bh_owner_dashboard')
     except Staff.DoesNotExist:
@@ -301,6 +334,20 @@ def office_dashboard(request):
 
     current_office = staff_member.office
     clearance_requests = ClearanceRequest.objects.filter(office=current_office)
+    
+    # Search functionality
+    search_query = request.GET.get('search', '')
+    if search_query:
+        clearance_requests = clearance_requests.filter(
+            Q(student__student_id__icontains=search_query) |
+            Q(student__user__first_name__icontains=search_query) |
+            Q(student__user__last_name__icontains=search_query)
+        )
+    
+    # Pagination
+    paginator = Paginator(clearance_requests, 10)  # Show 10 requests per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
 
     if request.method == 'POST':
         request_id = request.POST.get('clearance_request_id')
@@ -327,6 +374,8 @@ def office_dashboard(request):
 
     context = {
         'office': current_office,
+        'page_obj': page_obj,
+        'search_query': search_query,
         'clearance_requests': clearance_requests,
     }
     return render(request, 'core/office_dashboard.html', context)
@@ -346,57 +395,76 @@ def office_settings(request):
 
 
 class ProgramChairDashboardView(LoginRequiredMixin, TemplateView):
-      template_name = 'core/program_chair_dashboard.html'
+    template_name = 'core/program_chair_dashboard.html'
 
-      def get_context_data(self, **kwargs):
-          context = super().get_context_data(**kwargs)
-          pc = self.request.user.programchair  # current program chair
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        pc = self.request.user.programchair  # current program chair
 
-          context['total_students'] = Student.objects.filter(
-              user__is_staff=False,
-              program_chair=pc
-          ).count()
+        # Get all students for this program chair
+        students = Student.objects.filter(
+            user__is_staff=False,
+            program_chair=pc
+        ).order_by('user__first_name')
 
-          context['pending_clearances'] = Clearance.objects.filter(
-              is_cleared=True, 
-              program_chair_approved=False, 
-              student__program_chair=pc
-          ).count()
+        # Handle search
+        search_query = self.request.GET.get('search', '')
+        if search_query:
+            students = students.filter(
+                Q(student_id__icontains=search_query) |
+                Q(user__first_name__icontains=search_query) |
+                Q(user__last_name__icontains=search_query)
+            )
 
-          context['approved_clearances'] = Clearance.objects.filter(
-              program_chair_approved=True,
-              student__program_chair=pc
-          ).count()
+        # Pagination
+        paginator = Paginator(students, 10)  # Show 10 students per page
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
 
-          # Clearance status for dashboard breakdown
-          context['clearance_stats'] = {
-              'ready_for_approval': Clearance.objects.filter(
-                  is_cleared=True, 
-                  program_chair_approved=False,
-                  student__program_chair=pc
-              ),
-              'recently_approved': Clearance.objects.filter(
-                  program_chair_approved=True,
-                  student__program_chair=pc
-              ).order_by('-cleared_date')[:5]
-          }
+        context['total_students'] = Student.objects.filter(
+            user__is_staff=False,
+            program_chair=pc
+        ).count()
 
-          # Course-wise statistics and the detailed student list filtered by program chair
-          context['course_stats'] = Student.objects.filter(
-              user__is_staff=False,
-              program_chair=pc
-          ).values('course').annotate(
-              total=Count('id'),
-              cleared=Count('clearance', filter=Q(clearance__is_cleared=True))
-          )
+        context['pending_clearances'] = Clearance.objects.filter(
+            is_cleared=True, 
+            program_chair_approved=False, 
+            student__program_chair=pc
+        ).count()
 
-          # List of assigned students for this program chair
-          context['students'] = Student.objects.filter(
-              user__is_staff=False,
-              program_chair=pc
-          ).order_by('user__first_name')
+        context['approved_clearances'] = Clearance.objects.filter(
+            program_chair_approved=True,
+            student__program_chair=pc
+        ).count()
 
-          return context
+        # Clearance status for dashboard breakdown
+        context['clearance_stats'] = {
+            'ready_for_approval': Clearance.objects.filter(
+                is_cleared=True, 
+                program_chair_approved=False,
+                student__program_chair=pc
+            ),
+            'recently_approved': Clearance.objects.filter(
+                program_chair_approved=True,
+                student__program_chair=pc
+            ).order_by('-cleared_date')[:5]
+        }
+
+        # Course-wise statistics
+        context['course_stats'] = Student.objects.filter(
+            user__is_staff=False,
+            program_chair=pc
+        ).values('course').annotate(
+            total=Count('id'),
+            cleared=Count('clearance', filter=Q(clearance__is_cleared=True))
+        )
+
+        # Add search and pagination context
+        context['search_query'] = search_query
+        context['page_obj'] = page_obj
+        context['students'] = students  # Keep this for other parts of the template
+
+        return context
 def unlock_permit_view(request, clearance_id):
         """
         Allows the Program Chair to unlock the permit for a student
@@ -477,6 +545,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Q
 from core.models import Payment, Student, Staff
 
 @login_required
@@ -769,6 +839,326 @@ def admin_clearances(request):
         'denied_count': denied_count,
     }
     return render(request, 'admin/clearances.html', context)
+
+
+@login_required
+def student_profile(request):
+    """View for students to see and manage their profile."""
+    try:
+        student = request.user.student
+    except Student.DoesNotExist:
+        messages.error(request, 'You are not authorized to view this page.')
+        return redirect('login')
+
+    context = {
+        'student': student,
+        'student_info': {
+            'full_name': student.user.get_full_name(),
+            'student_id': student.student_id,
+            'course': student.course,
+            'year_level': student.year_level,
+            'is_boarder': student.is_boarder,
+            'program_chair': student.program_chair
+        }
+    }
+    return render(request, 'core/student_profile.html', context)
+
+
+@login_required
+def student_detail(request, student_id):
+    """View for program chairs to see detailed student information."""
+    # Get student and verify program chair access
+    student = get_object_or_404(Student, pk=student_id)
+    if not hasattr(request.user, 'programchair') or student.program_chair != request.user.programchair:
+        messages.error(request, "You are not authorized to view this student's details.")
+        return redirect('program_chair_dashboard')
+
+    # Get all clearance requests with related data
+    clearance_requests = student.clearance_requests.select_related(
+        'office', 'reviewed_by'
+    ).order_by('office__name')
+
+    context = {
+        'student': student,
+        'clearance_requests': clearance_requests,
+    }
+    return render(request, 'core/student_detail.html', context)
+
+
+
+
+@login_required
+def clearance_status(request):
+    """View for students to check their clearance status."""
+    try:
+        student = request.user.student
+    except Student.DoesNotExist:
+        messages.error(request, 'You are not authorized to view this page.')
+        return redirect('login')
+
+    clearance = get_object_or_404(Clearance, student=student)
+    clearance_requests = student.clearance_requests.select_related('office', 'reviewed_by').all()
+
+    context = {
+        'student': student,
+        'clearance': clearance,
+        'clearance_requests': clearance_requests,
+        'pending_count': clearance_requests.filter(status='pending').count(),
+        'approved_count': clearance_requests.filter(status='approved').count(),
+        'denied_count': clearance_requests.filter(status='denied').count()
+    }
+    return render(request, 'core/clearance_status.html', context)
+
+
+class ManageStudentsView(LoginRequiredMixin, ListView):
+    template_name = 'core/manage_students.html'
+    context_object_name = 'page_obj'
+    paginate_by = 10
+
+    def get_queryset(self):
+        pc = self.request.user.programchair
+        queryset = Student.objects.filter(program_chair=pc).order_by('user__first_name')
+        
+        # Handle search
+        search_query = self.request.GET.get('search', '')
+        if search_query:
+            queryset = queryset.filter(
+                Q(student_id__icontains=search_query) |
+                Q(user__first_name__icontains=search_query) |
+                Q(user__last_name__icontains=search_query)
+            )
+        
+        # Handle filters
+        course = self.request.GET.get('course')
+        year_level = self.request.GET.get('year_level')
+        clearance_status = self.request.GET.get('clearance_status')
+        
+        if course:
+            queryset = queryset.filter(course=course)
+        if year_level:
+            queryset = queryset.filter(year_level=year_level)
+        if clearance_status:
+            if clearance_status == 'cleared':
+                queryset = queryset.filter(clearance__is_cleared=True)
+            elif clearance_status == 'pending':
+                queryset = queryset.filter(clearance__is_cleared=False)
+        
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        pc = self.request.user.programchair
+        context['courses'] = Student.objects.filter(program_chair=pc).values_list('course', flat=True).distinct()
+        context['year_levels'] = range(1, 5)  # 1 to 4 year levels
+        context['search_query'] = self.request.GET.get('search', '')
+        context['selected_course'] = self.request.GET.get('course', '')
+        context['selected_year'] = self.request.GET.get('year_level', '')
+        context['selected_status'] = self.request.GET.get('clearance_status', '')
+        return context
+
+
+class GenerateReportsView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/generate_reports.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            pc = self.request.user.programchair
+            
+            # Get date range
+            start_date = self.request.GET.get('start_date')
+            end_date = self.request.GET.get('end_date')
+            if start_date:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            if end_date:
+                end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            
+            # Get filters
+            report_type = self.request.GET.get('report_type', 'clearance_summary')
+            course_filter = self.request.GET.get('course')
+            status_filter = self.request.GET.get('status')
+            
+            # Base queryset with select_related for better performance
+            students = Student.objects.filter(program_chair=pc).select_related(
+                'user', 'clearance'
+            )
+            
+            if course_filter:
+                students = students.filter(course=course_filter)
+            
+            if status_filter:
+                if status_filter == 'cleared':
+                    students = students.filter(clearance__is_cleared=True)
+                elif status_filter == 'pending':
+                    students = students.filter(clearance__is_cleared=False)
+            
+            # Apply date range if provided
+            if start_date and end_date:
+                students = students.filter(clearance__cleared_date__range=[start_date, end_date])
+            
+            # Generate report data based on type
+            report_data = None
+            if report_type == 'clearance_summary':
+                report_data = {
+                    'total_students': students.count(),
+                    'cleared_students': students.filter(clearance__is_cleared=True).count(),
+                    'pending_students': students.filter(clearance__is_cleared=False).count(),
+                }
+            elif report_type == 'course_statistics':
+                report_data = {
+                    'course_stats': []
+                }
+                for course in students.values_list('course', flat=True).distinct():
+                    course_students = students.filter(course=course)
+                    total = course_students.count()
+                    cleared = course_students.filter(clearance__is_cleared=True).count()
+                    report_data['course_stats'].append({
+                        'course': course,
+                        'total': total,
+                        'cleared': cleared,
+                        'pending': total - cleared,
+                        'clearance_rate': round((cleared / total * 100) if total > 0 else 0, 2)
+                    })
+            elif report_type == 'student_status':
+                report_data = {
+                    'students': students.values(
+                        'user__first_name', 'user__last_name', 'student_id',
+                        'course', 'year_level', 'clearance__is_cleared',
+                        'clearance__cleared_date'
+                    )
+                }
+            
+            context.update({
+                'report_type': report_type,
+                'start_date': start_date,
+                'end_date': end_date,
+                'courses': students.values_list('course', flat=True).distinct(),
+                'selected_course': course_filter,
+                'selected_status': status_filter,
+                'report_data': report_data,
+                'error_message': None
+            })
+            
+            # Handle export
+            export_format = self.request.GET.get('export')
+            if export_format and report_data:
+                try:
+                    if export_format == 'pdf':
+                        return self.export_pdf(report_data, report_type)
+                    elif export_format == 'excel':
+                        return self.export_excel(report_data, report_type)
+                except Exception as e:
+                    context['error_message'] = f"Error exporting report: {str(e)}"
+            
+            return context
+        except Exception as e:
+            context['error_message'] = f"Error generating report: {str(e)}"
+            return context
+
+    def export_pdf(self, report_data, report_type):
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename=report_{timezone.now().strftime("%Y%m%d")}.pdf'
+        
+        doc = SimpleDocTemplate(response, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title = Paragraph(f"Clearance Report - {report_type.replace('_', ' ').title()}", styles['Heading1'])
+        elements.append(title)
+        elements.append(Spacer(1, 12))
+        
+        # Date
+        date_text = Paragraph(f"Generated on {timezone.now().strftime('%B %d, %Y')}", styles['Normal'])
+        elements.append(date_text)
+        elements.append(Spacer(1, 12))
+        
+        if report_type == 'clearance_summary':
+            data = [
+                ['Metric', 'Value'],
+                ['Total Students', str(report_data['total_students'])],
+                ['Cleared Students', str(report_data['cleared_students'])],
+                ['Pending Students', str(report_data['pending_students'])]
+            ]
+        elif report_type == 'course_statistics':
+            data = [['Course', 'Total', 'Cleared', 'Pending', 'Clearance Rate']]
+            for stat in report_data['course_stats']:
+                data.append([
+                    stat['course'],
+                    str(stat['total']),
+                    str(stat['cleared']),
+                    str(stat['pending']),
+                    f"{stat['clearance_rate']}%"
+                ])
+        else:  # student_status
+            data = [['Name', 'ID', 'Course', 'Year Level', 'Status', 'Cleared Date']]
+            for student in report_data['students']:
+                data.append([
+                    f"{student['user__first_name']} {student['user__last_name']}",
+                    student['student_id'],
+                    student['course'],
+                    str(student['year_level']),
+                    'Cleared' if student['clearance__is_cleared'] else 'Pending',
+                    student['clearance__cleared_date'].strftime('%Y-%m-%d') if student['clearance__cleared_date'] else '-'
+                ])
+        
+        # Create table
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.green),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(table)
+        doc.build(elements)
+        return response
+
+    def export_excel(self, report_data, report_type):
+        wb = Workbook()
+        ws = wb.active
+        
+        # Write headers and data based on report type
+        if report_type == 'clearance_summary':
+            headers = ['Metric', 'Value']
+            data = [
+                ['Total Students', report_data['total_students']],
+                ['Cleared Students', report_data['cleared_students']],
+                ['Pending Students', report_data['pending_students']]
+            ]
+        elif report_type == 'course_statistics':
+            headers = ['Course', 'Total', 'Cleared', 'Pending', 'Clearance Rate']
+            data = [[s['course'], s['total'], s['cleared'], s['pending'], f"{s['clearance_rate']}%"]
+                   for s in report_data['course_stats']]
+        else:  # student_status
+            headers = ['Name', 'ID', 'Course', 'Year Level', 'Status', 'Cleared Date']
+            data = [[f"{s['user__first_name']} {s['user__last_name']}", s['student_id'],
+                    s['course'], s['year_level'],
+                    'Cleared' if s['clearance__is_cleared'] else 'Pending',
+                    s['clearance__cleared_date'].strftime('%Y-%m-%d') if s['clearance__cleared_date'] else '-']
+                   for s in report_data['students']]
+        
+        # Write headers
+        for col, header in enumerate(headers, 1):
+            ws.cell(row=1, column=col, value=header)
+        
+        # Write data
+        for row, row_data in enumerate(data, 2):
+            for col, cell_data in enumerate(row_data, 1):
+                ws.cell(row=row, column=col, value=cell_data)
+        
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename=report_{timezone.now().strftime("%Y%m%d")}.xlsx'
+        wb.save(response)
+        return response
 
 
 

@@ -1,75 +1,106 @@
 {% with request.resolver_match.url_name as url_name %}
-<div id="sidebar" class="bg-emerald-900 w-64 min-h-screen p-6 transition-all duration-300 transform -translate-x-full md:translate-x-0 fixed md:relative">
-    <div class="flex items-center gap-3 mb-8">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-        <h2 class="text-2xl font-bold text-white">Clearance System</h2>
-    </div>
-    <nav>
+<nav x-data="{ isOpen: true }" 
+     class="bg-emerald-900 sticky top-0 h-screen transition-all duration-300 flex flex-col" 
+     :class="isOpen ? 'w-64' : 'w-20'">
+    
+    <div class="p-6 flex-grow" :class="isOpen ? '' : 'px-4'">
+        <!-- Toggle Button -->
+        <button @click="isOpen = !isOpen" 
+                class="absolute -right-3 top-10 bg-emerald-800 rounded-full p-1.5 text-white hover:bg-emerald-700">
+            <svg xmlns="http://www.w3.org/2000/svg" 
+                 class="h-5 w-5 transition-transform duration-300" 
+                 :class="isOpen ? 'rotate-0' : 'rotate-180'" 
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </button>
+
+        <div class="flex items-center gap-3 mb-8" :class="isOpen ? '' : 'justify-center'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <h2 x-show="isOpen" class="text-2xl font-bold text-white">Clearance System</h2>
+        </div>
+
         <ul class="space-y-4">
             {% if user.is_staff %}
             <!-- Admin Navigation -->
             <li>
-                <a href="{% url 'admin_dashboard' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 {% if url_name == 'admin_dashboard' %}bg-emerald-800 text-white{% else %}hover:bg-emerald-800 hover:text-white{% endif %} rounded-lg transition-all duration-200">
+                <a href="{% url 'admin_dashboard' %}" 
+                   class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 {% if url_name == 'admin_dashboard' %}bg-emerald-800 text-white{% endif %}"
+                   :class="isOpen ? '' : 'justify-center px-2'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
                     </svg>
-                    <span>Dashboard</span>
+                    <span x-show="isOpen">Dashboard</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'admin_users' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 {% if url_name == 'admin_users' %}bg-emerald-800 text-white{% else %}hover:bg-emerald-800 hover:text-white{% endif %} rounded-lg transition-all duration-200">
+                <a href="{% url 'admin_users' %}" 
+                   class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 {% if url_name == 'admin_users' %}bg-emerald-800 text-white{% endif %}"
+                   :class="isOpen ? '' : 'justify-center px-2'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                     </svg>
-                    <span>Users</span>
+                    <span x-show="isOpen">Users</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'admin_offices' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 {% if url_name == 'admin_offices' %}bg-emerald-800 text-white{% else %}hover:bg-emerald-800 hover:text-white{% endif %} rounded-lg transition-all duration-200">
+                <a href="{% url 'admin_offices' %}" 
+                   class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 {% if url_name == 'admin_offices' %}bg-emerald-800 text-white{% endif %}"
+                   :class="isOpen ? '' : 'justify-center px-2'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
                     </svg>
-                    <span>Offices</span>
+                    <span x-show="isOpen">Offices</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'admin_clearances' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 {% if url_name == 'admin_clearances' %}bg-emerald-800 text-white{% else %}hover:bg-emerald-800 hover:text-white{% endif %} rounded-lg transition-all duration-200">
+                <a href="{% url 'admin_clearances' %}" 
+                   class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 {% if url_name == 'admin_clearances' %}bg-emerald-800 text-white{% endif %}"
+                   :class="isOpen ? '' : 'justify-center px-2'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
-                    <span>Clearances</span>
+                    <span x-show="isOpen">Clearances</span>
                 </a>
             </li>
             {% elif user.staff %}
             <!-- Staff Navigation -->
             <li>
-                <a href="{% url 'office_dashboard' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 {% if url_name == 'office_dashboard' %}bg-emerald-800 text-white{% else %}hover:bg-emerald-800 hover:text-white{% endif %} rounded-lg transition-all duration-200">
+                <a href="{% url 'office_dashboard' %}" 
+                   class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 {% if url_name == 'office_dashboard' %}bg-emerald-800 text-white{% endif %}"
+                   :class="isOpen ? '' : 'justify-center px-2'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
                     </svg>
-                    <span>Dashboard</span>
+                    <span x-show="isOpen">Dashboard</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'office_settings' %}" class="flex items-center gap-3 px-4 py-3 text-gray-300 {% if url_name == 'office_settings' %}bg-emerald-800 text-white{% else %}hover:bg-emerald-800 hover:text-white{% endif %} rounded-lg transition-all duration-200">
+                <a href="{% url 'office_settings' %}" 
+                   class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 {% if url_name == 'office_settings' %}bg-emerald-800 text-white{% endif %}"
+                   :class="isOpen ? '' : 'justify-center px-2'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
                     </svg>
-                    <span>Settings</span>
+                    <span x-show="isOpen">Settings</span>
                 </a>
             </li>
             {% endif %}
-            <li>
-                <a href="{% url 'logout' %}" class="flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-all duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
-                    </svg>
-                    <span>Logout</span>
-                </a>
-            </li>
         </ul>
-    </nav>
-</div>
+    </div>
+
+    <!-- Logout Section -->
+    <div class="p-6 border-t border-emerald-800" :class="isOpen ? '' : 'px-4'">
+        <a href="{% url 'logout' %}" 
+           class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200"
+           :class="isOpen ? '' : 'justify-center px-2'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
+            </svg>
+            <span x-show="isOpen">Logout</span>
+        </a>
+    </div>
+</nav>
 {% endwith %}

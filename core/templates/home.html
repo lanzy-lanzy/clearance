@@ -14,13 +14,15 @@
             <div class="text-center">
                 <div class="flex justify-center mb-8">
                     <img src="{% static 'img/permit_logo.png' %}" alt="JHCSC Logo" class="h-32 w-32 animate-fade hover:animate-pulse transition-all duration-300">
-                </div>                <h1 class="text-5xl tracking-tight font-extrabold text-white sm:text-6xl md:text-7xl">
-                    <span class="block">Student Clearance System</span>
+                </div>                
+                <h1 class="text-5xl tracking-tight font-extrabold text-white sm:text-6xl md:text-7xl">
+                    <span class="block">DIGIT'RANCE</span>
                     <span class="block text-emerald-200 mt-2">Simple. Fast. Digital.</span>
                 </h1>
                 <p class="mt-6 max-w-md mx-auto text-lg text-emerald-100 sm:text-xl md:mt-8 md:text-2xl md:max-w-3xl">
                     Streamline your clearance process with our modern digital platform. Get cleared faster and track your progress in real-time.
                 </p>
+            
                 <div class="mt-12 flex justify-center gap-6">
                     {% if not user.is_authenticated %}
                     <a href="{% url 'login' %}" class="flex items-center px-8 py-3 border-2 border-white text-base font-medium rounded-lg text-white hover:bg-white hover:text-emerald-700 transition duration-300 md:py-4 md:text-lg md:px-10">

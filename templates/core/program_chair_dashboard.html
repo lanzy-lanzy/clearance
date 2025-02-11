@@ -63,7 +63,7 @@ Program Chair Dashboard
           </tr>
         </thead>
         <tbody class="divide-y divide-emerald-100">
-          {% for student in students %}
+            {% for student in page_obj %}
           <tr class="hover:bg-emerald-50 transition-colors duration-200">
             <td class="px-4 py-3 text-emerald-900 font-medium">{{ student.user.get_full_name }}</td>
             <td class="px-4 py-3 text-emerald-800">{{ student.student_id }}</td>
@@ -256,6 +256,21 @@ Program Chair Dashboard
   <!-- All Students with Permit Printing -->
   <div class="bg-white shadow-lg rounded-xl p-6 border border-emerald-100">
     <h3 class="text-2xl font-bold mb-4 text-emerald-900">All Students</h3>
+    <!-- Search Form -->
+    <div class="mb-6">
+      <form method="GET" class="flex gap-2">
+        <input type="text" name="search" placeholder="Search by student name or ID..." 
+               class="flex-1 border border-emerald-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+               value="{{ search_query }}">
+        <button type="submit" 
+                class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+          </svg>
+          Search
+        </button>
+      </form>
+    </div>
     <div class="overflow-x-auto">
       <table class="min-w-full">
         <thead class="bg-emerald-50">
@@ -362,6 +377,36 @@ Program Chair Dashboard
         </tbody>
       </table>
     </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="flex items-center justify-center space-x-1 mt-6">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+         class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
+        Previous
+      </a>
+      {% endif %}
+
+      {% for num in page_obj.paginator.page_range %}
+      {% if page_obj.number == num %}
+        <span class="px-4 py-2 text-white bg-emerald-500 border border-emerald-500 rounded-lg">{{ num }}</span>
+      {% else %}
+        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+         class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
+        {{ num }}
+        </a>
+      {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+         class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
+        Next
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+    </div>
   </div>
-</div>
 {% endblock %}
