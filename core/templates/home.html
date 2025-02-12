@@ -39,7 +39,7 @@
                     </a>
                     {% else %}
                     <a href="{% if user.staff %}{% url 'office_dashboard' %}
-                            {% elif user|hasattr:'programchair' %}{% url 'program_chair_dashboard' %}
+                            {% elif user|has_attr:'programchair' %}{% url 'program_chair_dashboard' %}
                             {% else %}{% url 'student_dashboard' %}{% endif %}" 
                        class="flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-500 transition duration-300 md:py-4 md:text-lg md:px-10 shadow-lg">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

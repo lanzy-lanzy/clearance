@@ -1,65 +1,107 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load myfilters %}
+{% block sidebar %}
+{% include 'components/program_chair_sidenav.html' %}
+{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-	<div class="bg-white rounded-lg shadow-lg overflow-hidden">
-		<!-- Header -->
-		<div class="bg-blue-600 px-6 py-4">
-			<h3 class="text-2xl font-bold text-white">Generate Reports</h3>
-		</div>
+<div class="flex">
+		<!-- Main Content -->
+	<div class="flex-1 p-8 bg-gray-100">
+		<div class="max-w-7xl mx-auto">
+			<!-- Header -->
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold text-gray-900 mb-2">Generate Reports</h1>
+				<p class="text-gray-600">Generate and download comprehensive reports for your department</p>
+			</div>
 
-		<!-- Content -->
-		<div class="p-6">
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-				<!-- Generate PDF Card -->
-				<div class="bg-white rounded-lg shadow-md">
+			<!-- Report Options Grid -->
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+				<!-- PDF Report Card -->
+				<div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
 					<div class="p-6">
-						<h5 class="text-xl font-semibold mb-3">Generate PDF Report</h5>
-						<p class="text-gray-600 mb-4">Generate a comprehensive PDF report of all clearance requests and their statuses.</p>
-						<a href="{% url 'generate_report' %}" 
-						   class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+						<div class="flex items-center justify-center w-12 h-12 bg-emerald-100 rounded-lg mb-4">
+							<svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+							</svg>
+						</div>
+						<h3 class="text-xl font-semibold text-gray-900 mb-2">PDF Report</h3>
+						<p class="text-gray-600 mb-4">Generate a detailed PDF report with comprehensive clearance statistics</p>
+						<a href="{% url 'generate_report' %}" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
 							<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-								<path d="M7 3C7 2.44772 7.44772 2 8 2H16C16.5523 2 17 2.44772 17 3V13C17 13.5523 16.5523 14 16 14H8C7.44772 14 7 13.5523 7 13V3ZM9 4V12H15V4H9Z"/>
-								<path d="M3 7C3 6.44772 3.44772 6 4 6H5V14C5 15.6569 6.34315 17 8 17H16V18C16 18.5523 15.5523 19 15 19H4C3.44772 19 3 18.5523 3 18V7Z"/>
+								<path d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z"/>
 							</svg>
 							Generate PDF
 						</a>
 					</div>
 				</div>
 
-				<!-- Report Summary Card -->
-				<div class="bg-white rounded-lg shadow-md">
+				<!-- Statistics Summary -->
+				<div class="bg-white rounded-xl shadow-md overflow-hidden">
 					<div class="p-6">
-						<h5 class="text-xl font-semibold mb-4">Report Summary</h5>
-						<div class="space-y-3">
+						<h3 class="text-xl font-semibold text-gray-900 mb-4">Statistics Summary</h3>
+						<div class="space-y-4">
 							{% if user.staff %}
 								<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 									<span class="text-gray-700">Pending Requests</span>
-									<span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm">
+									<span class="bg-emerald-600 text-white px-4 py-1 rounded-full text-sm font-medium">
 										{{ clearance_requests.pending_count }}
 									</span>
 								</div>
 								<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 									<span class="text-gray-700">Approved Requests</span>
-									<span class="bg-green-600 text-white px-3 py-1 rounded-full text-sm">
+									<span class="bg-emerald-600 text-white px-4 py-1 rounded-full text-sm font-medium">
 										{{ clearance_requests.approved_count }}
+									</span>
+								</div>
+								<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+									<span class="text-gray-700">Denied Requests</span>
+									<span class="bg-red-600 text-white px-4 py-1 rounded-full text-sm font-medium">
+										{{ clearance_requests.denied_count }}
 									</span>
 								</div>
 							{% elif user.programchair %}
 								<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 									<span class="text-gray-700">Total Students</span>
-									<span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm">
+									<span class="bg-emerald-600 text-white px-4 py-1 rounded-full text-sm font-medium">
 										{{ total_students }}
 									</span>
 								</div>
 								<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 									<span class="text-gray-700">Cleared Students</span>
-									<span class="bg-green-600 text-white px-3 py-1 rounded-full text-sm">
+									<span class="bg-emerald-600 text-white px-4 py-1 rounded-full text-sm font-medium">
 										{{ cleared_students }}
 									</span>
 								</div>
+								<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+									<span class="text-gray-700">Pending Clearance</span>
+									<span class="bg-yellow-500 text-white px-4 py-1 rounded-full text-sm font-medium">
+										{{ total_students|subtract:cleared_students }}
+									</span>
+								</div>
 							{% endif %}
+						</div>
+					</div>
+				</div>
+
+				<!-- Quick Actions -->
+				<div class="bg-white rounded-xl shadow-md overflow-hidden">
+					<div class="p-6">
+						<h3 class="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h3>
+						<div class="space-y-3">
+							<button class="w-full flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+								<span class="text-gray-700">View All Reports</span>
+								<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</button>
+							<button class="w-full flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+								<span class="text-gray-700">Export Data</span>
+								<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</button>
 						</div>
 					</div>
 				</div>

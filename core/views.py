@@ -10,10 +10,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from datetime import datetime
+from io import BytesIO  # Add this import
 
 # PDF Generation
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape  # Add landscape here
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -843,128 +844,30 @@ def admin_clearances(request):
     }
     return render(request, 'admin/clearances.html', context)
 
+from .utils import generate_pdf_report
 
 @login_required
 def generate_report(request):
-    """Generate a PDF report based on clearance data."""
-    # Create the HttpResponse object with PDF headers
+    # Prepare data
+    data = {
+        'total_students': Student.objects.count(),
+        'cleared_students': Student.objects.filter(clearance__is_cleared=True).count(),
+        'pending_clearance': Student.objects.filter(clearance__is_cleared=False).count(),
+        'detailed_data': [
+            ['SET', 10, 20, 5],
+            ['STE', 15, 25, 3],
+            ['SOCJE', 8, 18, 2],
+            ['SAFES', 12, 22, 4],
+        ]
+    }
+    
+    # Create response object
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="clearance_report.pdf"'
     
-    # Create the PDF object using ReportLab
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter),
-                          rightMargin=72, leftMargin=72,
-                          topMargin=72, bottomMargin=72)
-
-    # Container for the 'Flowable' objects
-    elements = []
-
-    # Define styles
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        spaceAfter=30,
-        alignment=1  # Center alignment
-    )
+    # Generate PDF
+    generate_pdf_report(response, data)
     
-    subtitle_style = ParagraphStyle(
-        'CustomSubTitle',
-        parent=styles['Heading2'],
-        fontSize=16,
-        spaceAfter=20,
-        alignment=1
-    )
-
-    # Add the title
-    elements.append(Paragraph("Clearance System Report", title_style))
-    elements.append(Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y')}", subtitle_style))
-    elements.append(Spacer(1, 20))
-
-    # Get statistics based on user role
-    if hasattr(request.user, 'staff'):
-        # Staff/Office view
-        staff = request.user.staff
-        clearance_requests = ClearanceRequest.objects.filter(office=staff.office)
-        
-        # Create data for the table
-        data = [['Student ID', 'Name', 'Course', 'Status', 'Date']]
-        for cr in clearance_requests:
-            data.append([
-                cr.student.student_id,
-                f"{cr.student.user.get_full_name()}",
-                cr.student.course,
-                cr.status.title(),
-                cr.request_date.strftime('%Y-%m-%d')
-            ])
-        
-        # Add office summary
-        elements.append(Paragraph(f"Office: {staff.office.name}", styles['Heading3']))
-        elements.append(Paragraph(f"Total Requests: {clearance_requests.count()}", styles['Normal']))
-        elements.append(Spacer(1, 20))
-
-    elif hasattr(request.user, 'programchair'):
-        # Program Chair view
-        pc = request.user.programchair
-        students = Student.objects.filter(program_chair=pc)
-        
-        # Create data for the table
-        data = [['Student ID', 'Name', 'Course', 'Year Level', 'Clearance Status']]
-        for student in students:
-            clearance = getattr(student, 'clearance', None)
-            status = 'Cleared' if clearance and clearance.is_cleared else 'Pending'
-            data.append([
-                student.student_id,
-                f"{student.user.get_full_name()}",
-                student.course,
-                student.year_level,
-                status
-            ])
-        
-        # Add program summary
-        elements.append(Paragraph(f"Department: {pc.designation}", styles['Heading3']))
-        elements.append(Paragraph(f"Total Students: {students.count()}", styles['Normal']))
-        elements.append(Spacer(1, 20))
-
-    # Create the table
-    table = Table(data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 14),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 12),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
-    ]))
-    
-    elements.append(table)
-    
-    # Add timestamp and page number
-    footer_style = ParagraphStyle(
-        'Footer',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=colors.grey
-    )
-    elements.append(Spacer(1, 20))
-    elements.append(Paragraph(f"Generated by: {request.user.get_full_name()}", footer_style))
-
-    # Build the PDF document
-    doc.build(elements)
-    
-    # Get the value of the BytesIO buffer and write it to the response
-    pdf = buffer.getvalue()
-    buffer.close()
-    response.write(pdf)
     return response
 
 
