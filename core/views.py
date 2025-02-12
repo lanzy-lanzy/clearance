@@ -172,13 +172,14 @@ def register_view(request):
                 messages.error(request, "Boarder students must select a dormitory owner!")
                 return redirect('register')
 
-            # Create user
+            # Create user with is_active=False (pending approval)
             user = User.objects.create_user(
                 username=username,
                 email=email,
                 password=password,
                 first_name=first_name,
-                last_name=last_name
+                last_name=last_name,
+                is_active=False  # Set user as inactive until approved
             )
 
             # Create student profile with program chair assignment
@@ -188,7 +189,8 @@ def register_view(request):
                 course=course,
                 year_level=int(year_level),
                 is_boarder=is_boarder,
-                program_chair_id=program_chair_id  # Assign program chair using ID
+                program_chair_id=program_chair_id,  # Assign program chair using ID
+                is_approved=False  # Set initial approval status
             )
 
             # If student is a boarder and dormitory owner is selected, assign it
@@ -209,20 +211,9 @@ def register_view(request):
                     messages.error(request, "Selected dormitory owner not found!")
                     return redirect('register')
 
-            # Create clearance requests for the student
-            student.create_clearance_requests()
-            
-            # Create clearance record
-            Clearance.objects.create(student=student)
+            messages.success(request, "Registration successful! Please wait for admin approval before logging in.")
+            return redirect('login')
 
-            # Login the user
-            login(request, user)
-            messages.success(request, "Registration successful! Welcome to the clearance system.")
-            return redirect('student_dashboard')
-
-        except IntegrityError:
-            messages.error(request, "Registration failed. Please try again with different information.")
-            return redirect('register')
         except Exception as e:
             if 'user' in locals():
                 user.delete()
@@ -239,6 +230,7 @@ def register_view(request):
         'program_chairs': program_chairs,
         'dormitory_owners': dormitory_owners,
     })
+
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
@@ -251,27 +243,31 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
-            login(request, user)
-            try:
-                # Check for staff member first
-                if hasattr(user, 'staff'):
-                    staff = user.staff
-                    if staff.is_dormitory_owner:
-                        return redirect('bh_owner_dashboard')
-                    else:
-                        return redirect('office_dashboard')
-                # Then check other user types
-                elif user.is_staff:
-                    return redirect('admin_dashboard')
-                elif hasattr(user, 'programchair'):
-                    return redirect('program_chair_dashboard')
-                elif hasattr(user, 'student'):
-                    return redirect('student_dashboard')
-                else:
-                    messages.error(request, 'Invalid user type')
+            # Check if user is approved
+            if not user.is_active:
+                messages.error(request, "Your account is pending approval. Please wait for admin confirmation.")
+                return redirect('login')
+
+            if hasattr(user, 'student'):
+                if not user.student.is_approved:
+                    messages.error(request, "Your account is pending approval. Please wait for admin confirmation.")
                     return redirect('login')
-            except Staff.DoesNotExist:
-                messages.error(request, 'Staff profile not found')
+
+            login(request, user)
+            
+            # Redirect based on user type
+            if hasattr(user, 'staff'):
+                if user.staff.is_dormitory_owner:
+                    return redirect('bh_owner_dashboard')
+                return redirect('office_dashboard')
+            elif user.is_staff:
+                return redirect('admin_dashboard')
+            elif hasattr(user, 'programchair'):
+                return redirect('program_chair_dashboard')
+            elif hasattr(user, 'student'):
+                return redirect('student_dashboard')
+            else:
+                messages.error(request, 'Invalid user type')
                 return redirect('login')
         else:
             messages.error(request, 'Invalid credentials')
@@ -640,12 +636,19 @@ def admin_dashboard(request):
         messages.error(request, 'You are not authorized to access the admin dashboard.')
         return redirect('login')
 
+    # Get pending approval users - students who are inactive and not approved
+    pending_approvals = User.objects.filter(
+        is_active=False,
+        student__isnull=False,
+        student__is_approved=False
+    ).select_related('student')
+
     context = {
         'total_students': Student.objects.count(),
         'total_staff': Staff.objects.count(),
         'total_program_chairs': ProgramChair.objects.count(),
         'total_offices': Office.objects.count(),
-        'recent_students': Student.objects.select_related('user', 'program_chair').order_by('-created_at')[:5],
+        'pending_approvals': pending_approvals,
         'recent_clearances': Clearance.objects.select_related('student').order_by('-cleared_date')[:5],
         'clearance_stats': {
             'pending': ClearanceRequest.objects.filter(status='pending').count(),
@@ -1159,6 +1162,45 @@ class GenerateReportsView(LoginRequiredMixin, TemplateView):
         response['Content-Disposition'] = f'attachment; filename=report_{timezone.now().strftime("%Y%m%d")}.xlsx'
         wb.save(response)
         return response
+
+
+
+@login_required
+def approve_user(request, user_id):
+    if not request.user.is_staff:
+        messages.error(request, "You don't have permission to approve users.")
+        return redirect('admin_dashboard')
+
+    user = get_object_or_404(User, id=user_id)
+    student = get_object_or_404(Student, user=user)
+
+    if request.method == 'POST':
+        user.is_active = True
+        user.save()
+        student.is_approved = True
+        student.approval_date = timezone.now()
+        student.approval_admin = request.user
+        student.save()
+        
+        # Create initial clearance requests
+        student.create_clearance_requests()
+        
+        messages.success(request, f"User {user.get_full_name()} has been approved.")
+    return redirect('admin_dashboard')
+
+@login_required
+def reject_user(request, user_id):
+    if not request.user.is_staff:
+        messages.error(request, "You don't have permission to reject users.")
+        return redirect('admin_dashboard')
+
+    user = get_object_or_404(User, id=user_id)
+    
+    if request.method == 'POST':
+        # Delete the user and associated student profile
+        user.delete()
+        messages.success(request, "User registration has been rejected and removed.")
+    return redirect('admin_dashboard')
 
 
 

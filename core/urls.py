@@ -40,5 +40,9 @@ urlpatterns = [
   path('dashboard/users/edit/<int:user_id>/', views.admin_edit_user, name='admin_edit_user'),
   path('dashboard/offices/', views.admin_offices, name='admin_offices'),
   path('dashboard/clearances/', views.admin_clearances, name='admin_clearances'),
+  
+  # Admin approval URLs
+  path('approve-user/<int:user_id>/', views.approve_user, name='approve_user'),
+  path('reject-user/<int:user_id>/', views.reject_user, name='reject_user'),
 ]
 

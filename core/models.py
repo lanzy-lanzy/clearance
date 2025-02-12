@@ -104,6 +104,9 @@ class Student(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     program_chair = models.ForeignKey(ProgramChair, on_delete=models.SET_NULL, null=True, blank=True, related_name="students")
     dormitory_owner = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, related_name="students_dorm", limit_choices_to={'is_dormitory_owner': True})
+    is_approved = models.BooleanField(default=False)
+    approval_date = models.DateTimeField(null=True, blank=True)
+    approval_admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_students')
 
     @property
     def full_name(self):
@@ -112,6 +115,13 @@ class Student(models.Model):
     def __str__(self):
             return f"{self.full_name} ({self.student_id})"
     
+    def approve_student(self, admin_user):
+        """Approve a student's registration"""
+        self.is_approved = True
+        self.approval_date = timezone.now()
+        self.approval_admin = admin_user
+        self.save()
+
     def create_clearance_requests(self):
             """Creates clearance requests for all required offices, including Dormitory if boarder."""
             from core.models import Office, ClearanceRequest  # import here to avoid circular imports
