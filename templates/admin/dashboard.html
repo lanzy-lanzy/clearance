@@ -169,14 +169,20 @@
 						<form method="POST" action="{% url 'approve_user' pending_user.id %}" class="inline">
 							{% csrf_token %}
 							<button type="submit" name="action" value="approve" 
-									class="text-emerald-600 hover:text-emerald-900 mr-3">
+									class="text-emerald-600 hover:text-emerald-900 mr-3 inline-flex items-center">
+								<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+								</svg>
 								Approve
 							</button>
 						</form>
 						<form method="POST" action="{% url 'reject_user' pending_user.id %}" class="inline">
 							{% csrf_token %}
 							<button type="submit" name="action" value="reject" 
-									class="text-red-600 hover:text-red-900">
+									class="text-red-600 hover:text-red-900 inline-flex items-center">
+								<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+								</svg>
 								Reject
 							</button>
 						</form>
