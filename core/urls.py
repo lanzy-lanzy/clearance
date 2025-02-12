@@ -3,7 +3,7 @@ from django.contrib.auth.views import LogoutView
 from . import views
 from .views import (
   ProgramChairDashboardView, unlock_permit_view, ProgramChairStudentsView, 
-  print_permit, ManageStudentsView, GenerateReportsView
+  print_permit, ManageStudentsView, GenerateReportsView, generate_report
 )
 
 
@@ -44,5 +44,6 @@ urlpatterns = [
   # Admin approval URLs
   path('approve-user/<int:user_id>/', views.approve_user, name='approve_user'),
   path('reject-user/<int:user_id>/', views.reject_user, name='reject_user'),
+  path('generate-report/', generate_report, name='generate_report'),
 ]
 
