@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.dispatch import receiver 
 from django.db.models.signals import post_save
 from django.utils import timezone
+from django.utils import timezone
 
 class Office(models.Model):
     """Represents different offices handling clearance."""
@@ -196,7 +197,7 @@ class Clearance(models.Model):
         denied_requests = self.student.clearance_requests.filter(status='denied').exists()
         if not pending_requests and not denied_requests:
             self.is_cleared = True
-            self.cleared_date = models.DateTimeField(auto_now=True)
+            self.cleared_date = timezone.now()  # Use a datetime value here.
             self.save()
 
     def unlock_permit(self):
@@ -223,3 +224,5 @@ class Payment(models.Model):
     def __str__(self):
         status = "Paid" if self.is_paid else "Unpaid"
         return f"{self.student.full_name} - {status} - {self.amount}"
+
+

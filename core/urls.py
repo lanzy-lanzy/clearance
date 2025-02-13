@@ -45,5 +45,7 @@ urlpatterns = [
   path('approve-user/<int:user_id>/', views.approve_user, name='approve_user'),
   path('reject-user/<int:user_id>/', views.reject_user, name='reject_user'),
   path('generate-report/', generate_report, name='generate_report'),
+  path('clearance/<int:clearance_id>/delete/', views.delete_clearance, name='delete_clearance'),
+
 ]
 

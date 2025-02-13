@@ -32,6 +32,16 @@ from core.models import (
 def home(request):
     return render(request, 'home.html')
 
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib import messages
+from .models import Clearance  # adjust import as needed
+
+def delete_clearance(request, clearance_id):
+    clearance = get_object_or_404(Clearance, id=clearance_id)
+    if request.method == 'POST':
+        clearance.delete()
+        messages.success(request, 'Clearance deleted successfully.')
+    return redirect('program_chair_dashboard')
 
 
 @login_required
