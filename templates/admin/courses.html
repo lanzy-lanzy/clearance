@@ -3,26 +3,36 @@
 {% block admin_content %}
 <div class="space-y-6">
     <!-- Add Course Form -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">Add New Course</h2>
+    <div class="bg-white rounded-lg shadow-md p-6 transform hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Add New Course</h2>
+                <p class="text-sm text-gray-600 mt-1">Create a new course in the system</p>
+            </div>
+            <div class="p-3 bg-emerald-100 rounded-full">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+            </div>
+        </div>
         <form method="POST" class="space-y-4">
             {% csrf_token %}
             <input type="hidden" name="action" value="add">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label for="code" class="block text-sm font-medium text-gray-700">Course Code</label>
                     <input type="text" name="code" id="code" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 transition-colors">
                 </div>
                 <div>
                     <label for="name" class="block text-sm font-medium text-gray-700">Course Name</label>
                     <input type="text" name="name" id="name" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 transition-colors">
                 </div>
                 <div>
                     <label for="dean" class="block text-sm font-medium text-gray-700">Dean</label>
                     <select name="dean" id="dean"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 transition-colors">
                         <option value="">-- Select Dean --</option>
                         {% for dean in deans %}
                         <option value="{{ dean.id }}">{{ dean.name }}</option>
@@ -30,9 +40,12 @@
                     </select>
                 </div>
             </div>
-            <div class="flex justify-end">
+            <div class="flex justify-end mt-6">
                 <button type="submit"
-                    class="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">
+                    class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
                     Add Course
                 </button>
             </div>
@@ -41,8 +54,11 @@
 
     <!-- Courses List -->
     <div class="bg-white rounded-lg shadow-md">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-700">Courses List</h2>
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Courses List</h2>
+                <p class="text-sm text-gray-600 mt-1">Manage existing courses in the system</p>
+            </div>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -56,15 +72,24 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for course in courses %}
-                    <tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">{{ course.code }}</div>
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span class="text-blue-600 font-medium">{{ course.code|slice:":2" }}</span>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">{{ course.code }}</div>
+                                </div>
+                            </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-6 py-4">
                             <div class="text-sm text-gray-900">{{ course.name }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-500">{{ course.dean.name|default:"-" }}</div>
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                {{ course.dean.name|default:"-" }}
+                            </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <form method="POST" class="inline">
@@ -72,8 +97,11 @@
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="course_id" value="{{ course.id }}">
                                 <button type="submit" 
-                                        class="text-red-600 hover:text-red-900"
+                                        class="inline-flex items-center text-red-600 hover:text-red-900 transition-colors"
                                         onclick="return confirm('Are you sure you want to delete this course?')">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
                                     Delete
                                 </button>
                             </form>

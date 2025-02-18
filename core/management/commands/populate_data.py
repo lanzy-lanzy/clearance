@@ -103,6 +103,96 @@ class Command(BaseCommand):
         # Get the dormitory office reference after creation
         dormitory_office = Office.objects.get(name="DORMITORY")
 
+        self.stdout.write(self.style.SUCCESS("\nCreating Staff Members..."))
+        staff_data = [
+            {
+                "username": "osa_staff",
+                "password": "staff123",
+                "first_name": "OSA",
+                "last_name": "Staff",
+                "email": "osa.staff@example.com",
+                "office": "OSA",
+                "role": "OSA Officer"
+            },
+            {
+                "username": "library_staff",
+                "password": "staff123",
+                "first_name": "Library",
+                "last_name": "Staff",
+                "email": "library.staff@example.com",
+                "office": "LIBRARY",
+                "role": "Librarian"
+            },
+            {
+                "username": "accounting_staff",
+                "password": "staff123",
+                "first_name": "Accounting",
+                "last_name": "Staff",
+                "email": "accounting.staff@example.com",
+                "office": "ACCOUNTING OFFICE",
+                "role": "Accounting Officer"
+            },
+            {
+                "username": "registrar_staff",
+                "password": "staff123",
+                "first_name": "Registrar",
+                "last_name": "Staff",
+                "email": "registrar.staff@example.com",
+                "office": "REGISTRAR OFFICE",
+                "role": "Registrar Officer"
+            },
+            {
+                "username": "guidance_staff",
+                "password": "staff123",
+                "first_name": "Guidance",
+                "last_name": "Staff",
+                "email": "guidance.staff@example.com",
+                "office": "Guidance Office",
+                "role": "Guidance Counselor"
+            },
+            {
+                "username": "laboratory_staff",
+                "password": "staff123",
+                "first_name": "Laboratory",
+                "last_name": "Staff",
+                "email": "lab.staff@example.com",
+                "office": "LABORATORY",
+                "role": "Laboratory Technician"
+            }
+        ]
+
+        for staff_info in staff_data:
+            # Create User
+            user, created = User.objects.get_or_create(
+                username=staff_info["username"],
+                defaults={
+                    "first_name": staff_info["first_name"],
+                    "last_name": staff_info["last_name"],
+                    "email": staff_info["email"],
+                    "is_active": True
+                }
+            )
+            if created:
+                user.set_password(staff_info["password"])
+                user.save()
+
+            # Get office
+            office = Office.objects.get(name=staff_info["office"])
+
+            # Create Staff
+            staff, created = Staff.objects.get_or_create(
+                user=user,
+                defaults={
+                    "office": office,
+                    "role": staff_info["role"],
+                    "is_dormitory_owner": False
+                }
+            )
+
+            self.stdout.write(self.style.SUCCESS(
+                f"{'Created' if created else 'Found'} staff member: {staff.user.get_full_name()} ({staff.office.name})"
+            ))
+
         self.stdout.write(self.style.SUCCESS("\nCreating BH Owners..."))
         # Create multiple BH owners
         bh_owners_data = [
@@ -188,13 +278,14 @@ class Command(BaseCommand):
                     "first_name": pc_info["first_name"],
                     "last_name": pc_info["last_name"],
                     "email": pc_info["email"],
-                    "is_active": True
+                    "is_active": True,
                 }
             )
             if created:
                 user.set_password("pc_pass123")
                 user.save()
 
+            # Create the Program Chair entry
             pc, created = ProgramChair.objects.get_or_create(
                 user=user,
                 defaults={
@@ -341,54 +432,44 @@ class Command(BaseCommand):
             {
                 "name": "SSB SET",
                 "description": "Student Services Bureau - School of Engineering and Technology",
-                "office_type": "SSB SET"
+                "office_type": "SET"
             },
             {
                 "name": "SSB STE",
                 "description": "Student Services Bureau - School of Teacher Education",
-                "office_type": "SSB STE"
+                "office_type": "STE"
             },
             {
                 "name": "SSB SOCJE",
                 "description": "Student Services Bureau - School of Criminal Justice Education",
-                "office_type": "SSB SOCJE"
+                "office_type": "SOCJE"
             },
             {
                 "name": "SSB SAFES",
                 "description": "Student Services Bureau - School of Agriculture, Forestry and Environmental Sciences",
-                "office_type": "SSB SAFES"
-            },
-            # Dean offices (for permit printing only)
-            {
-                "name": "SET DEAN",
-                "description": "School of Engineering and Technology Dean's Office",
-                "office_type": "SET"
-            },
-            {
-                "name": "STE DEAN",
-                "description": "School of Teacher Education Dean's Office",
-                "office_type": "STE"
-            },
-            {
-                "name": "SOCJE DEAN",
-                "description": "School of Criminal Justice Education Dean's Office",
-                "office_type": "SOCJE"
-            },
-            {
-                "name": "SAFES DEAN",
-                "description": "School of Agriculture, Forestry and Environmental Sciences Dean's Office",
                 "office_type": "SAFES"
             }
         ]
 
+        # Get all deans for office affiliation
+        deans = {dean.name: dean for dean in Dean.objects.all()}
+
         for office_data in offices:
+            # Determine the affiliated dean based on office type
+            affiliated_dean = None
+            if office_data["office_type"] in ["SET", "STE", "SOCJE", "SAFES"]:
+                dean_name = f"{office_data['office_type']} DEAN"
+                affiliated_dean = deans.get(dean_name)
+
             office, created = Office.objects.get_or_create(
                 name=office_data["name"],
                 defaults={
                     "description": office_data["description"],
-                    "office_type": office_data["office_type"]
+                    "office_type": office_data["office_type"],
+                    "affiliated_dean": affiliated_dean
                 }
             )
+            
             if created:
                 created_count += 1
                 self.stdout.write(self.style.SUCCESS(f"Created office: {office.name}"))

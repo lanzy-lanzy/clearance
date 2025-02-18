@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load myfilters %}
-{% load dict_extras%}
+{% load dict_extras %}
+
 {% block title %}
 Program Chair Dashboard
 {% endblock title %}
@@ -13,183 +14,59 @@ Program Chair Dashboard
 <div class="container mx-auto p-6">
   <!-- Dashboard Header -->
   <div class="mb-8">
-    <h1 class="text-4xl font-bold text-emerald-900">DEAN Dashboard</h1>
+    <h1 class="text-4xl font-bold text-emerald-900">Program Chair Dashboard</h1>
     <p class="text-emerald-600 mt-2">Overview of clearance progress, student statistics and permit printing.</p>
   </div>
 
   <!-- Summary Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Pending Clearances Card -->
     <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg rounded-xl p-6 transform hover:scale-105 transition-all duration-300">
-      <div class="flex items-center">
-        <svg class="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-        </svg>
-        <h2 class="text-white text-xl font-semibold">Total Students</h2>
-      </div>
-      <p class="text-4xl font-bold text-white mt-4">{{ total_students }}</p>
-    </div>
-    <div class="bg-gradient-to-br from-amber-400 to-amber-500 shadow-lg rounded-xl p-6 transform hover:scale-105 transition-all duration-300">
       <div class="flex items-center">
         <svg class="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        <h2 class="text-white text-xl font-semibold">Pending Final Approval</h2>
+        <h2 class="text-white text-xl font-semibold">Pending Clearances</h2>
       </div>
       <p class="text-4xl font-bold text-white mt-4">{{ pending_clearances }}</p>
     </div>
+
+    <!-- Cleared Students Card -->
     <div class="bg-gradient-to-br from-green-500 to-green-600 shadow-lg rounded-xl p-6 transform hover:scale-105 transition-all duration-300">
       <div class="flex items-center">
         <svg class="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        <h2 class="text-white text-xl font-semibold">Approved Clearances</h2>
+        <h2 class="text-white text-xl font-semibold">Cleared Students</h2>
       </div>
-      <p class="text-4xl font-bold text-white mt-4">{{ approved_clearances }}</p>
+      <p class="text-4xl font-bold text-white mt-4">{{ cleared_students }}</p>
+    </div>
+
+    <!-- Total Students Card -->
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg rounded-xl p-6 transform hover:scale-105 transition-all duration-300">
+      <div class="flex items-center">
+        <svg class="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        <h2 class="text-white text-xl font-semibold">Total Students</h2>
+      </div>
+      <p class="text-4xl font-bold text-white mt-4">{{ total_students }}</p>
     </div>
   </div>
 
-  
-  <!-- Assigned Students Section -->
-  <div class="bg-white shadow-lg rounded-xl p-6 border border-emerald-100 mb-8">
-    <h3 class="text-2xl font-bold mb-4 text-emerald-900">Assigned Students</h3>
+  <!-- Students Table -->
+  <div class="bg-white shadow-lg rounded-xl p-6 border border-emerald-100">
+    <h3 class="text-2xl font-bold mb-4 text-emerald-900">Student List</h3>
     <div class="overflow-x-auto">
       <table class="min-w-full">
         <thead class="bg-emerald-50">
           <tr>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Name</th>
+            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Student Name</th>
             <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Student ID</th>
             <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Course</th>
             <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Year Level</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-emerald-100">
-            {% for student in page_obj %}
-          <tr class="hover:bg-emerald-50 transition-colors duration-200">
-            <td class="px-4 py-3 text-emerald-900 font-medium">{{ student.user.get_full_name }}</td>
-            <td class="px-4 py-3 text-emerald-800">{{ student.student_id }}</td>
-            <td class="px-4 py-3 text-emerald-800">{{ student.course }}</td>
-            <td class="px-4 py-3 text-emerald-800">{{ student.year_level }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="4" class="px-4 py-3 text-center text-emerald-600 italic">
-              No students assigned.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <!-- Clearance Breakdown Section -->
-
-  <!-- Course-wise Statistics -->
-  <div class="bg-white shadow-lg rounded-xl p-6 mb-8 border border-emerald-100">
-    <h3 class="text-2xl font-bold mb-4 text-emerald-900">Course-wise Statistics</h3>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-emerald-50">
-          <tr>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Course</th>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Total Students</th>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Cleared Students</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-emerald-100">
-          {% for stat in course_stats %}
-          <tr class="hover:bg-emerald-50 transition-colors duration-200">
-            <td class="px-4 py-3 font-medium text-emerald-900">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                {{ stat.course }}
-              </div>
-            </td>
-            <td class="px-4 py-3 text-emerald-800">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {{ stat.total }}
-              </div>
-            </td>
-            <td class="px-4 py-3 text-emerald-800">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {{ stat.cleared }}
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="3" class="px-4 py-3 text-center text-emerald-600 italic">
-              No course statistics available.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- All Students with Permit Printing -->
-  <div class="bg-white shadow-lg rounded-xl p-6 border border-emerald-100">
-    <h3 class="text-2xl font-bold mb-4 text-emerald-900">All Students</h3>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-emerald-50">
-          <tr>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Name
-              </div>
-            </th>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                </svg>
-                Student ID
-              </div>
-            </th>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                Course
-              </div>
-            </th>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                Year Level
-              </div>
-            </th>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Status
-              </div>
-            </th>
-            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Actions
-              </div>
-            </th>
+            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Status</th>
+            <th class="px-4 py-3 text-left text-sm font-medium text-emerald-700">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-emerald-100">
@@ -197,31 +74,29 @@ Program Chair Dashboard
           <tr class="hover:bg-emerald-50 transition-colors duration-200">
             <td class="px-4 py-3 font-medium text-emerald-900">{{ student.full_name }}</td>
             <td class="px-4 py-3 text-emerald-800">{{ student.student_id }}</td>
-            <td class="px-4 py-3 text-emerald-800">{{ student.course }}</td>
+            <td class="px-4 py-3 text-emerald-800">{{ student.course.code }}</td>
             <td class="px-4 py-3 text-emerald-800">{{ student.year_level }}</td>
             <td class="px-4 py-3">
-              {% if student.clearance.is_cleared %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Cleared</span>
-              {% else %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending</span>
-              {% endif %}
+              {% with clearance=student.clearances.last %}
+                {% if clearance and clearance.is_cleared %}
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Cleared</span>
+                {% else %}
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending</span>
+                {% endif %}
+              {% endwith %}
             </td>
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
-                {% if student.clearance.is_cleared and student.clearance.program_chair_approved %}
-                  <a href="{% url 'print_permit' student.clearance.id %}" class="inline-flex items-center px-3 py-1.5 bg-emerald-500 text-white text-sm font-medium rounded-lg hover:bg-emerald-600">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    Print Permit
-                  </a>
-                {% endif %}
-                {% comment %} {% if student.clearance %}
-                  <form method="post" action="{% url 'delete_clearance' student.clearance.id %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" onclick="return confirm('Delete this clearance?');" class="px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600">Delete</button>
-                  </form>
-                {% endif %} {% endcomment %}
+                {% with clearance=student.clearances.last %}
+                  {% if clearance and clearance.is_cleared %}
+                    <a href="{% url 'print_permit' clearance.id %}" class="inline-flex items-center px-3 py-1.5 bg-emerald-500 text-white text-sm font-medium rounded-lg hover:bg-emerald-600">
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                      </svg>
+                      Print Permit
+                    </a>
+                  {% endif %}
+                {% endwith %}
               </div>
             </td>
           </tr>
@@ -239,30 +114,30 @@ Program Chair Dashboard
   {% if page_obj.has_other_pages %}
   <div class="flex items-center justify-center space-x-1 mt-6">
     {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+    <a href="?page={{ page_obj.previous_page_number }}" 
        class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
       Previous
     </a>
     {% endif %}
 
     {% for num in page_obj.paginator.page_range %}
-    {% if page_obj.number == num %}
-      <span class="px-4 py-2 text-white bg-emerald-500 border border-emerald-500 rounded-lg">{{ num }}</span>
-    {% else %}
-      <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-       class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
-      {{ num }}
-      </a>
-    {% endif %}
+      {% if page_obj.number == num %}
+        <span class="px-4 py-2 text-white bg-emerald-500 border border-emerald-500 rounded-lg">{{ num }}</span>
+      {% else %}
+        <a href="?page={{ num }}" 
+           class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
+          {{ num }}
+        </a>
+      {% endif %}
     {% endfor %}
 
     {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+    <a href="?page={{ page_obj.next_page_number }}" 
        class="px-4 py-2 text-emerald-500 hover:text-white border border-emerald-500 hover:bg-emerald-500 rounded-lg transition-colors duration-200">
       Next
     </a>
     {% endif %}
   </div>
   {% endif %}
-  </div>
+</div>
 {% endblock %}

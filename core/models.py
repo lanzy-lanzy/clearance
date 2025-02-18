@@ -76,19 +76,50 @@ class Staff(models.Model):
 class ProgramChair(models.Model):
     """Represents a program chair (dean) user responsible for final clearance approval."""
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    # Instead of designations via a string, we link to the Dean model
     dean = models.ForeignKey(Dean, on_delete=models.SET_NULL, null=True, blank=True)
+    profile_picture = models.ImageField(
+        upload_to='program_chair_profiles/',
+        null=True,
+        blank=True
+    )
+
+    def get_profile_picture_url(self):
+        if self.profile_picture and hasattr(self.profile_picture, 'url'):
+            return self.profile_picture.url
+        return static('img/default-profile.png')
+
+    @property
+    def is_program_chair(self):
+        return True
+
+class UserProfile(models.Model):
+    """Represents additional profile information for admin users."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    profile_picture = models.ImageField(
+        upload_to='admin_profiles/',
+        null=True,
+        blank=True
+    )
+
+    def get_profile_picture_url(self):
+        if self.profile_picture and hasattr(self.profile_picture, 'url'):
+            return self.profile_picture.url
+        return static('img/default-profile.png')
 
     def __str__(self):
-        dean_name = self.dean.name if self.dean else "No Dean Assigned"
-        return f"{self.user.get_full_name()} - {dean_name}"
+        return f"{self.user.username}'s Profile"
 
-    def get_logo_url(self):
-        if self.dean and self.dean.logo:
-            logo_path = os.path.join(settings.BASE_DIR, 'static', self.dean.logo.name)
-            if os.path.exists(logo_path):
-                return self.dean.logo.url
-        return 'img/permit_logo.png'
+# Add a signal to create UserProfile automatically when a superuser is created
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created and instance.is_superuser:
+        UserProfile.objects.create(user=instance)
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    if instance.is_superuser:
+        if not hasattr(instance, 'userprofile'):
+            UserProfile.objects.create(user=instance)
 
 class Student(models.Model):
     """Represents students requesting clearance."""
@@ -217,12 +248,32 @@ class ClearanceRequest(models.Model):
     def __str__(self):
         return f"{self.student} - {self.office} - {self.school_year} {self.get_semester_display()} ({self.status})"
 
-    def approve(self, staff):
+    def validate_staff_permission(self, staff):
+        """Validates if a staff member can handle this clearance request."""
+        if staff.office != self.office:
+            raise PermissionError(
+                f"You don't have permission to handle clearance requests for {self.office.name}. "
+                f"You can only handle requests for {staff.office.name}."
+            )
+
+        # Special handling for dormitory clearances
         if self.office.name == "DORMITORY":
             if not staff.is_dormitory_owner:
-                raise PermissionError("Only dormitory owners can approve dormitory clearances.")
+                raise PermissionError("Only dormitory owners can handle dormitory clearances.")
             if self.student.dormitory_owner != staff:
-                raise PermissionError("You can only approve clearances for your assigned students.")
+                raise PermissionError("You can only handle clearances for your assigned students.")
+
+        # Special handling for SSB offices
+        if self.office.name.startswith('SSB'):
+            student_dean = self.student.course.dean
+            if self.office.affiliated_dean != student_dean:
+                raise PermissionError(
+                    "You can only handle SSB clearances for students from your school."
+                )
+
+    def approve(self, staff):
+        """Approve a clearance request."""
+        self.validate_staff_permission(staff)
         
         self.status = "approved"
         self.reviewed_by = staff
@@ -238,17 +289,25 @@ class ClearanceRequest(models.Model):
         clearance.check_clearance()
 
     def deny(self, staff, reason):
-        if self.office.name == "DORMITORY":
-            if not staff.is_dormitory_owner:
-                raise PermissionError("Only dormitory owners can deny dormitory clearances.")
-            if self.student.dormitory_owner != staff:
-                raise PermissionError("You can only deny clearances for your assigned students.")
+        """Deny a clearance request with a reason."""
+        if not reason:
+            raise ValueError("A reason must be provided when denying a clearance request.")
+        
+        self.validate_staff_permission(staff)
         
         self.status = "denied"
         self.reviewed_by = staff
         self.notes = reason
         self.reviewed_date = timezone.now()
         self.save()
+
+    def can_be_handled_by(self, staff):
+        """Check if a staff member can handle this clearance request."""
+        try:
+            self.validate_staff_permission(staff)
+            return True
+        except PermissionError:
+            return False
 
 class Clearance(models.Model):
     """Represents the final clearance status of a student."""

@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.views.generic import TemplateView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse, JsonResponse
@@ -14,6 +14,7 @@ from io import BytesIO
 import os
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.views.decorators.http import require_POST
 
 # PDF Generation
 from reportlab.lib import colors
@@ -29,6 +30,7 @@ from openpyxl import Workbook
 from core.models import (
     ClearanceRequest, Clearance, Staff, Student, 
     Office, ProgramChair, User, Dean, Course,
+    UserProfile,  # Add this import
     SEMESTER_CHOICES
 )
 
@@ -39,10 +41,10 @@ def user_logout(request):
     return redirect('login')
 def home(request):
     if request.user.is_authenticated:
-        if hasattr(request.user, 'student'):
+        if hasattr(request.user, 'programchair'):
+            return redirect('program_chair_dashboard')
+        elif hasattr(request.user, 'student'):
             return redirect('student_dashboard')
-        elif hasattr(request.user, 'staff'):
-            return redirect('staff_dashboard')
         elif request.user.is_superuser:
             return redirect('admin_dashboard')
     return render(request, 'home.html')
@@ -51,8 +53,8 @@ def user_login(request):
     if request.user.is_authenticated:
         if hasattr(request.user, 'student'):
             return redirect('student_dashboard')
-        elif hasattr(request.user, 'staff'):
-            return redirect('staff_dashboard')
+        elif hasattr(request.user, 'programchair'):  # Changed from staff to programchair
+            return redirect('program_chair_dashboard')
         elif request.user.is_superuser:
             return redirect('admin_dashboard')
     
@@ -71,8 +73,8 @@ def user_login(request):
             # Redirect based on user type
             if hasattr(user, 'student'):
                 return redirect('student_dashboard')
-            elif hasattr(user, 'staff'):
-                return redirect('staff_dashboard')
+            elif hasattr(user, 'programchair'):  # Changed from staff to programchair
+                return redirect('program_chair_dashboard')
             elif user.is_superuser:
                 return redirect('admin_dashboard')
         else:
@@ -189,45 +191,83 @@ def delete_clearance(request, clearance_id):
 def update_clearance_request(request, request_id):
     """
     Allows a staff member to approve or deny a clearance request.
-    For dormitory clearances, ensures only the assigned dormitory owner can approve/deny.
+    Staff can only handle clearance requests for their assigned office.
+    Special handling for dormitory clearances.
     """
     clearance_request = get_object_or_404(ClearanceRequest, pk=request_id)
     
     try:
         staff_member = request.user.staff
         
+        # Check if staff member belongs to the office of the clearance request
+        if staff_member.office != clearance_request.office:
+            messages.error(
+                request, 
+                f"You don't have permission to handle clearance requests for {clearance_request.office.name}. "
+                f"You can only handle requests for {staff_member.office.name}."
+            )
+            return redirect('office_dashboard')
+
         # Special handling for dormitory clearances
-        if clearance_request.office.name == 'Dormitory':
+        if clearance_request.office.name == "DORMITORY":
             if not staff_member.is_dormitory_owner:
                 messages.error(request, "Only dormitory owners can handle dormitory clearances.")
                 return redirect('office_dashboard')
             if clearance_request.student.dormitory_owner != staff_member:
                 messages.error(request, "You can only handle clearances for your assigned students.")
                 return redirect('office_dashboard')
+
+        # Special handling for SSB offices
+        if clearance_request.office.name.startswith('SSB'):
+            # Check if the student belongs to the correct school
+            student_dean = clearance_request.student.course.dean
+            if clearance_request.office.affiliated_dean != student_dean:
+                messages.error(
+                    request, 
+                    "You can only handle SSB clearances for students from your school."
+                )
+                return redirect('office_dashboard')
+
     except Staff.DoesNotExist:
         messages.error(request, "Staff access required.")
         return redirect('login')
 
     if request.method == 'POST':
-        new_status = request.POST.get('status')
+        action = request.POST.get('action')
         remarks = request.POST.get('remarks', '')
         
         try:
-            if new_status == 'approved':
+            if action == 'approve':
                 clearance_request.approve(staff_member)
-            elif new_status == 'denied':
+                messages.success(
+                    request, 
+                    f"Clearance request approved for {clearance_request.student.full_name}"
+                )
+            elif action == 'deny':
+                if not remarks:
+                    messages.error(request, "Remarks are required when denying a clearance request.")
+                    return redirect('office_dashboard')
                 clearance_request.deny(staff_member, remarks)
-            
-            # Check overall clearance status
-            clearance = getattr(clearance_request.student, 'clearance', None)
-            if clearance:
-                clearance.check_clearance()
-                
-            messages.success(request, f"Clearance request {new_status} successfully.")
+                messages.success(
+                    request, 
+                    f"Clearance request denied for {clearance_request.student.full_name}"
+                )
+            else:
+                messages.error(request, "Invalid action specified.")
+                return redirect('office_dashboard')
 
+        except PermissionError as e:
+            messages.error(request, str(e))
         except Exception as e:
             messages.error(request, f"Error processing request: {str(e)}")
-            return redirect('office_dashboard')
+        
+        # Refresh the student's overall clearance status
+        clearance = Clearance.objects.get(
+            student=clearance_request.student,
+            school_year=clearance_request.school_year,
+            semester=clearance_request.semester
+        )
+        clearance.check_clearance()
 
     return redirect('office_dashboard')
 
@@ -238,22 +278,17 @@ class ManageStudentsView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     context_object_name = 'students'
     
     def test_func(self):
-        return self.request.user.is_superuser
+        return hasattr(self.request.user, 'programchair')  # Changed from is_superuser
     
     def get_queryset(self):
-        return Student.objects.select_related(
-            'user', 
-            'course', 
-            'program_chair', 
-            'dormitory_owner'
-        ).all()
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['courses'] = Course.objects.all()
-        context['program_chairs'] = ProgramChair.objects.all()
-        context['dormitory_owners'] = Staff.objects.filter(is_dormitory_owner=True)
-        return context
+        program_chair = self.request.user.programchair
+        return Student.objects.filter(course__dean=program_chair.dean).select_related(
+            'user', 'course', 'program_chair'
+        )
+
+    def handle_no_permission(self):
+        messages.error(self.request, "You don't have permission to access this page.")
+        return redirect('home')
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
@@ -495,23 +530,50 @@ def get_offices(request, dean_id):
         'name': office.name
     } for office in offices]
     return JsonResponse(data, safe=False)
+def is_program_chair(user):
+    return hasattr(user, 'programchair')
+
 @login_required
+@user_passes_test(is_program_chair)
 def program_chair_dashboard(request):
-    try:
-        program_chair = request.user.programchair
-        # Get relevant data for the program chair's dashboard
-        students = Student.objects.filter(program_chair=program_chair)
-        clearances = Clearance.objects.filter(student__in=students).order_by('-school_year', '-semester')
-        
-        context = {
-            'program_chair': program_chair,
-            'students': students,
-            'clearances': clearances,
-        }
-        return render(request, 'core/program_chair_dashboard.html', context)
-    except ProgramChair.DoesNotExist:
-        messages.error(request, "Program Chair profile not found.")
-        return redirect('home')
+    program_chair = request.user.programchair
+    students = Student.objects.filter(course__dean=program_chair.dean)
+    
+    # Get current school year and semester
+    current_year = timezone.now().year
+    school_year = f"{current_year}-{current_year + 1}"
+    semester = "1ST"  # You might want to make this dynamic
+    
+    # Count statistics
+    total_students = students.count()
+    cleared_students = students.filter(
+        clearances__is_cleared=True,  # Changed from clearance to clearances
+        clearances__school_year=school_year,
+        clearances__semester=semester
+    ).count()
+    
+    pending_clearances = students.filter(
+        clearances__is_cleared=False,
+        clearances__school_year=school_year,
+        clearances__semester=semester
+    ).count()
+    
+    # Get students with pagination
+    paginator = Paginator(students, 10)  # Show 10 students per page
+    page = request.GET.get('page')
+    students_page = paginator.get_page(page)
+    
+    context = {
+        'program_chair': program_chair,
+        'students': students_page,
+        'total_students': total_students,
+        'cleared_students': cleared_students,
+        'pending_clearances': pending_clearances,
+        'school_year': school_year,
+        'semester': semester,
+        'page_obj': students_page,  # For pagination
+    }
+    return render(request, 'core/program_chair_dashboard.html', context)
 
 @login_required
 def generate_reports(request):
@@ -554,3 +616,471 @@ def generate_report(request):
 def get_school_years():
     current_year = timezone.now().year
     return [f"{year}-{year + 1}" for year in range(current_year - 2, current_year + 1)]
+
+@login_required
+def create_clearance_requests(request):
+    if not hasattr(request.user, 'student'):
+        messages.error(request, "Access denied. Student profile required.")
+        return redirect('home')
+    
+    try:
+        student = request.user.student
+        current_year = timezone.now().year
+        school_year = f"{current_year}-{current_year + 1}"
+        
+        # Determine current semester based on month
+        month = timezone.now().month
+        if 6 <= month <= 10:
+            semester = "1ST"
+        elif month >= 11 or month <= 3:
+            semester = "2ND"
+        else:
+            semester = "SUM"
+        
+        # Create clearance requests
+        student.create_clearance_requests(school_year=school_year, semester=semester)
+        
+        messages.success(request, f"Clearance requests created for {school_year} {semester} semester.")
+    except Exception as e:
+        messages.error(request, f"Error creating clearance requests: {str(e)}")
+    
+    return redirect('student_dashboard')
+
+@login_required
+def view_clearance_details(request, clearance_id):
+    clearance = get_object_or_404(Clearance, id=clearance_id)
+    
+    # Security check - ensure student can only view their own clearance
+    if request.user.student != clearance.student:
+        messages.error(request, "You don't have permission to view this clearance.")
+        return redirect('student_dashboard')
+    
+    # Get all clearance requests for this clearance
+    clearance_requests = ClearanceRequest.objects.filter(
+        student=clearance.student,
+        school_year=clearance.school_year,
+        semester=clearance.semester
+    ).select_related('office', 'reviewed_by')
+    
+    context = {
+        'clearance': clearance,
+        'clearance_requests': clearance_requests,
+    }
+    return render(request, 'core/clearance_details.html', context)
+
+@login_required
+@require_POST
+def update_profile_picture(request):
+    try:
+        if 'profile_picture' not in request.FILES:
+            messages.error(request, 'No image file provided')
+            return redirect('home')
+
+        # Handle different user types
+        if hasattr(request.user, 'student'):
+            profile = request.user.student
+        elif hasattr(request.user, 'programchair'):
+            profile = request.user.programchair
+        elif request.user.is_superuser:
+            profile, created = UserProfile.objects.get_or_create(user=request.user)
+        else:
+            messages.error(request, 'Invalid user type')
+            return redirect('home')
+        
+        # Delete old profile picture if it exists
+        if profile.profile_picture:
+            profile.profile_picture.delete(save=False)
+        
+        # Save new profile picture
+        profile.profile_picture = request.FILES['profile_picture']
+        profile.save()
+
+        messages.success(request, 'Profile picture updated successfully')
+        
+        # Redirect based on user type
+        if hasattr(request.user, 'student'):
+            return redirect('student_profile')
+        elif hasattr(request.user, 'programchair'):
+            return redirect('program_chair_profile')
+        else:
+            return redirect('admin_profile')
+
+    except Exception as e:
+        messages.error(request, f'Error updating profile picture: {str(e)}')
+        return redirect('home')
+@login_required
+@user_passes_test(is_program_chair)
+def program_chair_profile(request):
+    """
+    Display and manage program chair profile information.
+    """
+    try:
+        program_chair = request.user.programchair
+        return render(request, 'core/program_chair_profile.html', {
+            'program_chair': program_chair
+        })
+    except ProgramChair.DoesNotExist:
+        messages.error(request, "Program chair profile not found.")
+        return redirect('home')
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def admin_profile(request):
+    """
+    Display and manage administrator profile information.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Access denied. Administrator privileges required.")
+        return redirect('home')
+    
+    # Get or create UserProfile for admin
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    return render(request, 'core/admin_profile.html', {
+        'admin_user': request.user,
+        'profile': profile
+    })
+
+@login_required
+def staff_dashboard(request):
+    """Staff dashboard view showing overview and recent requests."""
+    try:
+        staff = request.user.staff
+    except Staff.DoesNotExist:
+        return redirect('login')
+
+    # Get current semester info
+    current_year = timezone.now().year
+    school_year = f"{current_year}-{current_year + 1}"
+    month = timezone.now().month
+    
+    # Determine current semester based on month
+    if 6 <= month <= 10:
+        current_semester = "1ST"
+    elif month >= 11 or month <= 3:
+        current_semester = "2ND"
+    else:
+        current_semester = "SUM"
+
+    # Get pending requests
+    pending_requests = ClearanceRequest.objects.filter(
+        office=staff.office,
+        status='pending'
+    )
+
+    # Get today's statistics
+    today = timezone.now().date()
+    approved_today_count = ClearanceRequest.objects.filter(
+        office=staff.office,
+        status='approved',
+        reviewed_date__date=today
+    ).count()
+
+    # Get total processed requests
+    total_processed = ClearanceRequest.objects.filter(
+        office=staff.office,
+        status__in=['approved', 'denied']
+    )
+
+    # Get recent requests
+    recent_requests = ClearanceRequest.objects.filter(
+        office=staff.office
+    ).order_by('-request_date')[:10]
+
+    context = {
+        'current_semester': current_semester,
+        'pending_requests_count': pending_requests.count(),
+        'approved_today_count': approved_today_count,
+        'total_processed': total_processed.count(),
+        'recent_requests': recent_requests,
+    }
+
+    return render(request, 'core/staff_dashboard.html', context)  # Updated template path
+
+@login_required
+def staff_pending_requests(request):
+    """View for staff to manage their pending clearance requests."""
+    try:
+        staff = request.user.staff
+    except Staff.DoesNotExist:
+        return redirect('login')
+
+    # Get current semester info
+    current_year = timezone.now().year
+    school_year = f"{current_year}-{current_year + 1}"
+    month = timezone.now().month
+    
+    # Determine current semester based on month
+    if 6 <= month <= 10:
+        current_semester = "1ST"
+    elif month >= 11 or month <= 3:
+        current_semester = "2ND"
+    else:
+        current_semester = "SUM"
+
+    # Get pending requests for the staff's office
+    pending_requests = ClearanceRequest.objects.filter(
+        office=staff.office,
+        status='pending'
+    ).select_related(
+        'student',
+        'student__user',
+        'student__course'
+    ).order_by('-request_date')
+
+    context = {
+        'pending_requests': pending_requests,
+        'current_semester': current_semester,
+        'school_year': school_year,
+        'office': staff.office
+    }
+
+    return render(request, 'core/staff_pending_requests.html', context)  # Updated template path
+@login_required
+@require_POST
+def approve_clearance_request(request, request_id):
+    """Handle approval of a clearance request."""
+    try:
+        staff = request.user.staff
+        clearance_request = get_object_or_404(ClearanceRequest, id=request_id)
+        
+        # Approve the request
+        clearance_request.approve(staff)
+        
+        messages.success(request, 'Clearance request approved successfully.')
+        return JsonResponse({'status': 'success'})
+        
+    except PermissionError as e:
+        messages.error(request, str(e))
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=403)
+    except Exception as e:
+        messages.error(request, f'Error approving request: {str(e)}')
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@login_required
+@require_POST
+def deny_clearance_request(request, request_id):
+    """Handle denial of a clearance request."""
+    try:
+        staff = request.user.staff
+        clearance_request = get_object_or_404(ClearanceRequest, id=request_id)
+        
+        # Get reason from request body
+        data = json.loads(request.body)
+        reason = data.get('reason')
+        
+        if not reason:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'A reason must be provided for denial'
+            }, status=400)
+        
+        # Deny the request
+        clearance_request.deny(staff, reason)
+        
+        messages.success(request, 'Clearance request denied.')
+        return JsonResponse({'status': 'success'})
+        
+    except PermissionError as e:
+        messages.error(request, str(e))
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=403)
+    except Exception as e:
+        messages.error(request, f'Error denying request: {str(e)}')
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@login_required
+def staff_clearance_history(request):
+    """View for staff to see history of processed clearance requests."""
+    try:
+        staff = request.user.staff
+    except Staff.DoesNotExist:
+        return redirect('login')
+
+    # Get filter parameters from request
+    status = request.GET.get('status', '')
+    school_year = request.GET.get('school_year', '')
+    semester = request.GET.get('semester', '')
+    search_query = request.GET.get('search', '')
+
+    # Base queryset
+    clearance_requests = ClearanceRequest.objects.filter(
+        office=staff.office,
+        status__in=['approved', 'denied']
+    ).select_related(
+        'student',
+        'student__user',
+        'student__course',
+        'reviewed_by'
+    ).order_by('-reviewed_date')
+
+    # Apply filters
+    if status:
+        clearance_requests = clearance_requests.filter(status=status)
+    if school_year:
+        clearance_requests = clearance_requests.filter(school_year=school_year)
+    if semester:
+        clearance_requests = clearance_requests.filter(semester=semester)
+    if search_query:
+        clearance_requests = clearance_requests.filter(
+            Q(student__student_id__icontains=search_query) |
+            Q(student__user__first_name__icontains=search_query) |
+            Q(student__user__last_name__icontains=search_query)
+        )
+
+    # Get unique school years for filter dropdown
+    school_years = ClearanceRequest.objects.filter(
+        office=staff.office
+    ).values_list('school_year', flat=True).distinct()
+
+    # Pagination
+    paginator = Paginator(clearance_requests, 20)  # 20 items per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'school_years': school_years,
+        'current_filters': {
+            'status': status,
+            'school_year': school_year,
+            'semester': semester,
+            'search': search_query,
+        },
+        'office': staff.office,
+        'SEMESTER_CHOICES': SEMESTER_CHOICES,
+    }
+
+    return render(request, 'staff/clearance_history.html', context)
+@login_required
+def staff_profile(request):
+    """
+    Display and manage staff profile information.
+    """
+    try:
+        staff = request.user.staff
+    except Staff.DoesNotExist:
+        messages.error(request, "Staff profile not found.")
+        return redirect('home')
+
+    if request.method == 'POST':
+        # Handle profile updates
+        if 'update_role' in request.POST:
+            new_role = request.POST.get('role')
+            staff.role = new_role
+            staff.save()
+            messages.success(request, 'Role updated successfully')
+            return redirect('staff_profile')
+
+    context = {
+        'staff': staff,
+        'office': staff.office,
+        'user': request.user,
+        'is_dormitory_owner': staff.is_dormitory_owner,
+        'assigned_students': staff.students_dorm.all() if staff.is_dormitory_owner else None,
+    }
+
+    return render(request, 'staff/profile.html', context)
+
+@login_required
+def view_request(request, request_id):
+    """
+    View for staff to see details of a specific clearance request.
+    """
+    try:
+        staff = request.user.staff
+    except Staff.DoesNotExist:
+        messages.error(request, "Staff profile not found.")
+        return redirect('home')
+
+    # Get the clearance request with related data
+    clearance_request = get_object_or_404(
+        ClearanceRequest.objects.select_related(
+            'student',
+            'student__user',
+            'student__course',
+            'office',
+            'reviewed_by'
+        ),
+        id=request_id
+    )
+
+    # Check if staff member can handle this request
+    if not clearance_request.can_be_handled_by(staff):
+        messages.error(request, "You don't have permission to view this request.")
+        return redirect('staff_pending_requests')
+
+    # Handle POST requests for approving/denying
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        try:
+            if action == 'approve':
+                clearance_request.approve(staff)
+                messages.success(request, 'Clearance request approved successfully.')
+                return redirect('staff_pending_requests')
+            
+            elif action == 'deny':
+                reason = request.POST.get('reason')
+                if not reason:
+                    messages.error(request, 'A reason must be provided when denying a request.')
+                else:
+                    clearance_request.deny(staff, reason)
+                    messages.success(request, 'Clearance request denied.')
+                    return redirect('staff_pending_requests')
+        
+        except PermissionError as e:
+            messages.error(request, str(e))
+        except Exception as e:
+            messages.error(request, f'Error processing request: {str(e)}')
+
+    context = {
+        'clearance_request': clearance_request,
+        'student': clearance_request.student,
+        'office': staff.office,
+        'can_handle': clearance_request.can_be_handled_by(staff)
+    }
+
+    return render(request, 'staff/view_request.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

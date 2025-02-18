@@ -1,6 +1,6 @@
 <!-- Navbar -->
 {% load static %}
-<header class="bg-white shadow-sm p-4 flex justify-between items-center border-b border-gray-100 sticky top-0 z-50">
+<header class="bg-white shadow-lg p-4 flex justify-between items-center border-b border-gray-100 sticky top-0 z-50">
     <div class="flex items-center">
         <button id="menu-toggle" class="text-emerald-700 md:hidden hover:bg-emerald-50 p-2 rounded-lg transition-all duration-200">
             <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -9,81 +9,133 @@
         </button>
         <h1 class="text-xl font-bold flex items-center ml-4 text-gray-800">
             <a href="{% url 'home' %}" class="flex items-center group">
-                <img src="{% static 'img/permit_logo.png' %}" alt="JHCSC Logo" class="h-8 w-8 mr-3">
+                <img src="{% static 'img/permit_logo.png' %}" alt="JHCSC Logo" class="h-10 w-10 mr-3 rounded-full shadow-sm">
                 <span class="text-gradient bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-green-600 group-hover:from-emerald-700 group-hover:to-green-700 transition-all">
-                    {% block page_title %}DIGIT'RANCE{% endblock %}
+                    DIGIT'RANCE
                 </span>
             </a>
         </h1>
     </div>
     
-    <div class="flex items-center space-x-4">
+    <div class="flex items-center">
         {% if user.is_authenticated %}
-            <div class="relative group">
-                <!-- Profile Button -->
-                <div class="flex items-center space-x-3 bg-emerald-50 px-4 py-2 rounded-lg cursor-pointer hover:bg-emerald-100 transition-all duration-200">
-                    <div class="relative">
-                        <img 
-                            src="{% if user.student.profile_picture %}{{ user.student.profile_picture.url }}{% else %}{% static 'img/default-profile.png' %}{% endif %}" 
-                            alt="Profile Picture"
-                            class="w-8 h-8 rounded-full object-cover border-2 border-emerald-200 hover:border-emerald-300 transition-all duration-200"
-                            onerror="this.src='{% static 'img/default-profile.png' %}'"
-                        >
-                        <div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white"></div>
-                    </div>
-                    <div class="flex flex-col">
-                        <span class="text-sm font-medium text-emerald-800">{{ user.get_full_name }}</span>
-                        <span class="text-xs text-emerald-600">
-                            {% if user.is_staff %}Admin{% else %}Student{% endif %}
+            <div class="bg-white rounded-lg shadow-sm border border-emerald-100 hover:shadow-md transition-all duration-200">
+                <div class="flex items-center space-x-4 p-2">
+                    <div class="flex flex-col items-end">
+                        <span class="font-semibold text-lg text-emerald-800">
+                            {% if user.programchair %}
+                                {{ user.get_full_name }}
+                            {% elif user.student %}
+                                {{ user.student.full_name }}
+                            {% else %}
+                                {{ user.get_full_name }}
+                            {% endif %}
+                        </span>
+                        <span class="text-sm px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium">
+                            {% if user.programchair %}
+                                Program Chair
+                            {% elif user.student %}
+                                Student
+                            {% elif user.is_superuser %}
+                                Administrator
+                            {% endif %}
                         </span>
                     </div>
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </div>
-
-                <!-- Invisible bridge to prevent gap -->
-                <div class="absolute w-full h-4 top-full"></div>
-                
-                <!-- Dropdown Menu -->
-                <div class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg py-2 invisible opacity-0 transform -translate-y-2 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 ease-in-out border border-gray-100">
-                    <a href="{% url 'student_profile' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors duration-200">
-                        <svg class="w-4 h-4 mr-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                        </svg>
-                        View Profile
-                    </a>
-                    <form method="POST" action="{% url 'logout' %}" class="block">
-                        {% csrf_token %}
-                        <button type="submit" class="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200">
-                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                            </svg>
-                            Logout
-                        </button>
-                    </form>
+                    <div class="border-l border-gray-200 h-12"></div>
+                    <!-- Profile Picture and Dropdown -->
+                    <div class="relative group">
+                        {% if user.student %}
+                            <img src="{{ user.student.get_profile_picture_url }}" 
+                                 alt="Profile" 
+                                 class="w-10 h-10 rounded-full object-cover">
+                        {% elif user.programchair %}
+                            <img src="{{ user.programchair.get_profile_picture_url }}" 
+                                 alt="Profile" 
+                                 class="w-10 h-10 rounded-full object-cover">
+                        {% elif user.is_superuser %}
+                            {% if user.userprofile %}
+                                <img src="{{ user.userprofile.get_profile_picture_url }}" 
+                                     alt="Profile" 
+                                     class="w-10 h-10 rounded-full object-cover">
+                            {% else %}
+                                <img src="{% static 'img/default-profile.png' %}" 
+                                     alt="Profile" 
+                                     class="w-10 h-10 rounded-full object-cover">
+                            {% endif %}
+                        {% endif %}
+                        <!-- Dropdown Menu -->
+                        <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-1 group-hover:translate-y-0">
+                            {% if user.student %}
+                                <a href="{% url 'student_profile' %}" 
+                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-t-lg transition-colors">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                        </svg>
+                                        View Profile
+                                    </div>
+                                </a>
+                            {% elif user.programchair %}
+                                <a href="{% url 'program_chair_profile' %}" 
+                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-t-lg transition-colors">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                        </svg>
+                                        View Profile
+                                    </div>
+                                </a>
+                            {% elif user.is_superuser %}
+                                <a href="{% url 'admin_profile' %}" 
+                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-t-lg transition-colors">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                        </svg>
+                                        View Profile
+                                    </div>
+                                </a>
+                            {% endif %}
+                            <a href="{% url 'logout' %}" 
+                               class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                    </svg>
+                                    Logout
+                                </div>
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         {% else %}
-            <a href="{% url 'login' %}" class="flex items-center px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
-                </svg>
-                <span class="font-medium">Login</span>
-            </a>
-            <a href="{% url 'register' %}" class="flex items-center px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all duration-200 shadow-sm">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                </svg>
-                <span class="font-medium">Register</span>
-            </a>
+            <div class="flex items-center space-x-4">
+                <a href="{% url 'login' %}" 
+                   class="flex items-center px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                    </svg>
+                    <span class="font-medium">Login</span>
+                </a>
+                <a href="{% url 'register' %}" 
+                   class="flex items-center px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all duration-200 shadow-sm">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                    <span class="font-medium">Register</span>
+                </a>
+            </div>
         {% endif %}
     </div>
 </header>
 
 <style>
-    /* Add this style to ensure dropdown stays visible when hovering */
-    .group:hover .group-hover\:visible {
-        visibility: visible;
+    .text-gradient {
+        background-size: 100%;
+        -webkit-background-clip: text;
+        -moz-background-clip: text;
+        -webkit-text-fill-color: transparent; 
+        -moz-text-fill-color: transparent;
     }
 </style>
