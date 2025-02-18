@@ -16,11 +16,47 @@ urlpatterns = [
     path('clearance/<int:clearance_id>/delete/', views.delete_clearance, name='delete_clearance'),
     path('clearance-request/<int:request_id>/update/', views.update_clearance_request, name='update_clearance_request'),
     path('logout/', views.user_logout, name='logout'),
-    path('dashboard/create/users/', views.create_user, name='create_user')
+    path('dashboard/create/users/', views.create_user, name='create_user'),
+    path('login/', views.user_login, name='login'),
+    path('register/', views.register, name='register'),
+
 ]
 
-urlpatterns += [
-    path('api/program-chairs/<int:dean_id>/', views.get_program_chairs, name='api_program_chairs'),
-    path('api/courses/<int:dean_id>/', views.get_courses, name='api_courses'),
-    path('api/offices/<int:dean_id>/', views.get_offices, name='api_offices'),
-]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

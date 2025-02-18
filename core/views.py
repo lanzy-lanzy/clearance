@@ -46,6 +46,107 @@ def home(request):
             return redirect('admin_dashboard')
     return render(request, 'home.html')
 
+def user_login(request):
+    if request.user.is_authenticated:
+        if hasattr(request.user, 'student'):
+            return redirect('student_dashboard')
+        elif hasattr(request.user, 'staff'):
+            return redirect('staff_dashboard')
+        elif request.user.is_superuser:
+            return redirect('admin_dashboard')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            if not user.is_active:
+                messages.error(request, 'Your account is not yet approved. Please wait for admin approval.')
+                return redirect('login')
+            
+            login(request, user)
+            
+            # Redirect based on user type
+            if hasattr(user, 'student'):
+                return redirect('student_dashboard')
+            elif hasattr(user, 'staff'):
+                return redirect('staff_dashboard')
+            elif user.is_superuser:
+                return redirect('admin_dashboard')
+        else:
+            messages.error(request, 'Invalid username or password.')
+    
+    return render(request, 'registration/login.html')
+
+def register(request):
+    if request.user.is_authenticated:
+        return redirect('home')
+    
+    context = {
+        'program_chairs': ProgramChair.objects.all(),
+        'dormitory_owners': Staff.objects.filter(is_dormitory_owner=True)
+    }
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        email = request.POST.get('email')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        student_id = request.POST.get('student_id')
+        program_chair_id = request.POST.get('program_chair')
+        course_code = request.POST.get('course')
+        year_level = request.POST.get('year_level')
+        is_boarder = request.POST.get('is_boarder') == 'on'
+        dormitory_owner_id = request.POST.get('dormitory_owner')
+        
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists.')
+            return redirect('register')
+            
+        if User.objects.filter(email=email).exists():
+            messages.error(request, 'Email already exists.')
+            return redirect('register')
+            
+        try:
+            # Create inactive user (pending approval)
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                is_active=False
+            )
+            
+            # Get related objects
+            program_chair = ProgramChair.objects.get(id=program_chair_id)
+            course = Course.objects.get(code=course_code)
+            dormitory_owner = Staff.objects.get(id=dormitory_owner_id) if is_boarder and dormitory_owner_id else None
+            
+            # Create student profile
+            student = Student.objects.create(
+                user=user,
+                student_id=student_id,
+                course=course,
+                year_level=year_level,
+                is_boarder=is_boarder,
+                program_chair=program_chair,
+                dormitory_owner=dormitory_owner
+            )
+            
+            messages.success(request, 'Registration successful! Please wait for admin approval.')
+            return redirect('login')
+            
+        except Exception as e:
+            if user:
+                user.delete()
+            messages.error(request, f'Registration failed: {str(e)}')
+            return redirect('register')
+    
+    return render(request, 'registration/register.html', context)
+
 @login_required
 def student_dashboard(request):
     try:
