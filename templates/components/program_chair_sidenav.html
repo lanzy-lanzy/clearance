@@ -32,7 +32,7 @@
                     <span x-show="isOpen">Manage Students</span>
                 </a>
             </li>
-            <li>
+            {% comment %} <li>
                 <a href="{% url 'generate_reports' %}" 
                    class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-emerald-800 hover:text-white rounded-lg transition-all duration-200 {% if request.resolver_match.url_name == 'generate_reports' %}bg-emerald-800 text-white{% endif %}"
                    :class="isOpen ? '' : 'justify-center px-2'">
@@ -41,7 +41,7 @@
                     </svg>
                     <span x-show="isOpen">Generate Reports</span>
                 </a>
-            </li>
+            </li> {% endcomment %}
         </ul>
     </div>
 

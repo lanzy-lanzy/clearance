@@ -28,7 +28,8 @@ from openpyxl import Workbook
 # Local imports
 from core.models import (
     ClearanceRequest, Clearance, Staff, Student, 
-    Office, ProgramChair, User, Dean, Course
+    Office, ProgramChair, User, Dean, Course,
+    SEMESTER_CHOICES
 )
 
 # Basic Views
@@ -494,3 +495,62 @@ def get_offices(request, dean_id):
         'name': office.name
     } for office in offices]
     return JsonResponse(data, safe=False)
+@login_required
+def program_chair_dashboard(request):
+    try:
+        program_chair = request.user.programchair
+        # Get relevant data for the program chair's dashboard
+        students = Student.objects.filter(program_chair=program_chair)
+        clearances = Clearance.objects.filter(student__in=students).order_by('-school_year', '-semester')
+        
+        context = {
+            'program_chair': program_chair,
+            'students': students,
+            'clearances': clearances,
+        }
+        return render(request, 'core/program_chair_dashboard.html', context)
+    except ProgramChair.DoesNotExist:
+        messages.error(request, "Program Chair profile not found.")
+        return redirect('home')
+
+@login_required
+def generate_reports(request):
+    if request.method == 'POST':
+        # Handle report generation logic here
+        pass
+    
+    context = {
+        'school_years': get_school_years(),
+        'semesters': SEMESTER_CHOICES,
+    }
+    return render(request, 'core/generate_reports.html', context)
+
+@login_required
+def generate_report(request):
+    if request.method == 'POST':
+        school_year = request.POST.get('school_year')
+        semester = request.POST.get('semester')
+        report_type = request.POST.get('report_type')
+        
+        # Add your report generation logic here
+        if report_type == 'pdf':
+            # Generate PDF report
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="clearance_report_{school_year}_{semester}.pdf"'
+            # Add PDF generation logic here
+            return response
+            
+        elif report_type == 'excel':
+            # Generate Excel report
+            response = HttpResponse(content_type='application/vnd.ms-excel')
+            response['Content-Disposition'] = f'attachment; filename="clearance_report_{school_year}_{semester}.xlsx"'
+            # Add Excel generation logic here
+            return response
+            
+        messages.success(request, 'Report generated successfully')
+        
+    return redirect('generate_reports')
+
+def get_school_years():
+    current_year = timezone.now().year
+    return [f"{year}-{year + 1}" for year in range(current_year - 2, current_year + 1)]

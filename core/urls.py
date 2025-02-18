@@ -19,6 +19,11 @@ urlpatterns = [
     path('dashboard/create/users/', views.create_user, name='create_user'),
     path('login/', views.user_login, name='login'),
     path('register/', views.register, name='register'),
+    path('program-chair/dashboard/', views.program_chair_dashboard, name='program_chair_dashboard'),
+    path('generate-reports/', views.generate_reports, name='generate_reports'),
+    path('generate-report/', views.generate_report, name='generate_report'),
+
+  
 
 ]
 
