@@ -19,21 +19,51 @@
     
     <div class="flex items-center space-x-4">
         {% if user.is_authenticated %}
-            <div class="flex items-center bg-emerald-50 px-4 py-2 rounded-lg">
-                <svg class="w-5 h-5 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                </svg>
-                <span class="text-emerald-800 font-medium">{{ user.get_full_name }}</span>
-            </div>
-            <form method="POST" action="{% url 'logout' %}">
-                {% csrf_token %}
-                <button type="submit" class="flex items-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            <div class="relative group">
+                <!-- Profile Button -->
+                <div class="flex items-center space-x-3 bg-emerald-50 px-4 py-2 rounded-lg cursor-pointer hover:bg-emerald-100 transition-all duration-200">
+                    <div class="relative">
+                        <img 
+                            src="{% if user.student.profile_picture %}{{ user.student.profile_picture.url }}{% else %}{% static 'img/default-profile.png' %}{% endif %}" 
+                            alt="Profile Picture"
+                            class="w-8 h-8 rounded-full object-cover border-2 border-emerald-200 hover:border-emerald-300 transition-all duration-200"
+                            onerror="this.src='{% static 'img/default-profile.png' %}'"
+                        >
+                        <div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white"></div>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-sm font-medium text-emerald-800">{{ user.get_full_name }}</span>
+                        <span class="text-xs text-emerald-600">
+                            {% if user.is_staff %}Admin{% else %}Student{% endif %}
+                        </span>
+                    </div>
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
-                    <span class="font-medium">Logout</span>
-                </button>
-            </form>
+                </div>
+
+                <!-- Invisible bridge to prevent gap -->
+                <div class="absolute w-full h-4 top-full"></div>
+                
+                <!-- Dropdown Menu -->
+                <div class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg py-2 invisible opacity-0 transform -translate-y-2 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 ease-in-out border border-gray-100">
+                    <a href="{% url 'student_profile' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors duration-200">
+                        <svg class="w-4 h-4 mr-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        View Profile
+                    </a>
+                    <form method="POST" action="{% url 'logout' %}" class="block">
+                        {% csrf_token %}
+                        <button type="submit" class="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            Logout
+                        </button>
+                    </form>
+                </div>
+            </div>
         {% else %}
             <a href="{% url 'login' %}" class="flex items-center px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -50,3 +80,10 @@
         {% endif %}
     </div>
 </header>
+
+<style>
+    /* Add this style to ensure dropdown stays visible when hovering */
+    .group:hover .group-hover\:visible {
+        visibility: visible;
+    }
+</style>

@@ -113,9 +113,9 @@
 									class="mt-1 block w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500">
 								<option value="">Select your dean</option>
 								{% for chair in program_chairs %}
-									{% if 'SSB' not in chair.designation %}
-										<option value="{{ chair.id }}" data-designation="{{ chair.designation }}">
-											{{ chair.user.get_full_name }} - {{ chair.get_designation_display }}
+									{% if 'SSB' not in chair.dean.name %}
+										<option value="{{ chair.id }}" data-dean="{{ chair.dean.name }}">
+											{{ chair.user.get_full_name }} - {{ chair.dean.name }}
 										</option>
 									{% endif %}
 								{% endfor %}
@@ -206,8 +206,10 @@ const courseSelect = document.getElementById('course');
 
 programChairSelect.addEventListener('change', function() {
 	const selectedOption = this.options[this.selectedIndex];
-	const designation = selectedOption.getAttribute('data-designation');
-	const courses = coursesBySchool[designation] || [];
+	const deanName = selectedOption.getAttribute('data-dean');
+	console.log('Selected Dean:', deanName); // Debug line
+	const courses = coursesBySchool[deanName] || [];
+	console.log('Available Courses:', courses); // Debug line
 	
 	courseSelect.innerHTML = '<option value="">Select your course</option>';
 	

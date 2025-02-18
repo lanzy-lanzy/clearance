@@ -2,12 +2,20 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
 import random
-from core.models import Office, Staff, Student, ClearanceRequest, Clearance, ProgramChair, Payment
+from core.models import (
+    Office, Staff, Student, ClearanceRequest, 
+    Clearance, ProgramChair, Dean, Course
+)
 
 class Command(BaseCommand):
-    help = 'Populate database with initial sample data including offices, staff, students, and program chair assignments'
+    help = 'Populate database with initial sample data for all models'
 
     def handle(self, *args, **kwargs):
+        # Get or set current school year and semester
+        current_year = timezone.now().year
+        school_year = f"{current_year}-{current_year + 1}"
+        semester = "1ST"  # You can modify this as needed: "1ST", "2ND", or "SUM"
+
         self.stdout.write(self.style.SUCCESS("\nCreating Admin User..."))
         # Create superuser/admin account
         admin_user, created = User.objects.get_or_create(
@@ -27,38 +35,73 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.WARNING("Admin user already exists"))
 
-        self.stdout.write(self.style.SUCCESS("\nCreating Offices..."))
-        # Create all required offices
-        office_data = [
-            {"name": "SET", "description": "School of Engineering and Technology"},
-            {"name": "STE", "description": "School of Teacher Education"},
-            {"name": "SOCJE", "description": "School of Criminal Justice Education"},
-            {"name": "SAFES", "description": "School of Agriculture, Forestry and Environmental Sciences"},
-            {"name": "SSB SET", "description": "SSB School of Engineering and Technology"},
-            {"name": "SSB STE", "description": "SSB School of Teacher Education"},
-            {"name": "SSB SOCJE", "description": "SSB School of Criminal Justice Education"},
-            {"name": "SSB SAFES", "description": "SSB School of Agriculture, Forestry and Environmental Sciences"},
-            {"name": "Dormitory", "description": "Dormitory Office"},
-            {"name": "OSA", "description": "Office of Student Affairs"},
-            {"name": "Guidance Office", "description": "Student Guidance Office"},
-            {"name": "Library Office", "description": "Library Services"},
-            {"name": "Laboratory In-charge", "description": "Laboratory Management"},
-            {"name": "Accounting Office", "description": "Financial Services"},
-            {"name": "Registrar's Office", "description": "Academic Records Management"}
+        # Create Deans
+        self.stdout.write(self.style.SUCCESS("\nCreating Deans..."))
+        deans_data = [
+            {
+                "name": "SET DEAN",  # Changed to match the format used in JavaScript
+                "description": "School of Engineering and Technology"
+            },
+            {
+                "name": "STE DEAN",
+                "description": "School of Teacher Education"
+            },
+            {
+                "name": "SOCJE DEAN",
+                "description": "School of Criminal Justice Education"
+            },
+            {
+                "name": "SAFES DEAN",
+                "description": "School of Agriculture, Forestry and Environmental Sciences"
+            }
         ]
 
-        offices_created = []
-        for office_info in office_data:
-            office, created = Office.objects.get_or_create(
-                name=office_info["name"],
-                defaults={"description": office_info["description"]}
+        deans = []
+        for dean_data in deans_data:
+            dean, created = Dean.objects.get_or_create(
+                name=dean_data["name"],
+                defaults={"description": dean_data["description"]}
             )
-            offices_created.append(office)
-            message = f"Created office: {office.name}" if created else f"Office exists: {office.name}"
-            self.stdout.write(self.style.SUCCESS(message))
+            deans.append(dean)
+            self.stdout.write(self.style.SUCCESS(f"{'Created' if created else 'Found'} dean: {dean.name}"))
+
+        # Create Courses
+        self.stdout.write(self.style.SUCCESS("\nCreating Courses..."))
+        courses_data = [
+            # SET Courses
+            {"code": "BSIT", "name": "Bachelor of Science in Information Technology", "dean": "SET DEAN"},
+            {"code": "BSCS", "name": "Bachelor of Science in Computer Science", "dean": deans[0]},
+            # STE Courses
+            {"code": "BPED", "name": "Bachelor of Physical Education", "dean": "STE DEAN"},
+            {"code": "BEED", "name": "Bachelor of Elementary Education", "dean": "STE DEAN"},
+            {"code": "BSED", "name": "Bachelor of Secondary Education", "dean": "STE DEAN"},
+            {"code": "BAELS", "name": "Bachelor of Arts in English Language Studies", "dean": "STE DEAN"},
+            {"code": "BSMATH", "name": "Bachelor of Science in Mathematics", "dean": "STE DEAN"},
+            # SOCJE Courses
+            {"code": "BSCRIM", "name": "Bachelor of Science in Criminology", "dean": "SOCJE DEAN"},
+            {"code": "BSISM", "name": "Bachelor of Science in Industrial Security Management", "dean": "SOCJE DEAN"},
+            # SAFES Courses
+            {"code": "BSA", "name": "Bachelor of Science in Agriculture", "dean": "SAFES DEAN"},
+            {"code": "BSAES", "name": "Bachelor of Science in Agricultural Engineering Science", "dean": "SAFES DEAN"},
+            {"code": "BCF", "name": "Bachelor of Science in Commercial Farming", "dean": "SAFES DEAN"},
+        ]
+
+        for course_data in courses_data:
+            dean = Dean.objects.get(name=course_data["dean"])
+            course, created = Course.objects.get_or_create(
+                code=course_data["code"],
+                defaults={
+                    "name": course_data["name"],
+                    "dean": dean
+                }
+            )
+            self.stdout.write(self.style.SUCCESS(f"{'Created' if created else 'Found'} course: {course.code}"))
+
+        self.stdout.write(self.style.SUCCESS("\nCreating Offices..."))
+        self.create_offices()
 
         # Get the dormitory office reference after creation
-        dormitory_office = Office.objects.get(name="Dormitory")
+        dormitory_office = Office.objects.get(name="DORMITORY")
 
         self.stdout.write(self.style.SUCCESS("\nCreating BH Owners..."))
         # Create multiple BH owners
@@ -86,7 +129,8 @@ class Command(BaseCommand):
                 defaults={
                     "first_name": owner_data["first_name"],
                     "last_name": owner_data["last_name"],
-                    "email": owner_data["email"]
+                    "email": owner_data["email"],
+                    "is_active": True
                 }
             )
             if created:
@@ -102,217 +146,253 @@ class Command(BaseCommand):
                 }
             )
             bh_owners.append(staff)
-            message = f"Created BH Owner: {staff.user.get_full_name()}" if created else f"BH Owner exists: {staff.user.get_full_name()}"
-            self.stdout.write(self.style.SUCCESS(message))
-
-        self.stdout.write(self.style.SUCCESS("\nCreating Staff Members..."))
-        # Create staff members for each updated office
-        staff_data = [
-            {"username": "ssc_staff", "office_name": "SET", "role": "SET Officer"},
-            {"username": "osa_staff", "office_name": "OSA", "role": "OSA Coordinator"},
-            {"username": "guidance_staff", "office_name": "Guidance Office", "role": "Guidance Counselor"},
-            {"username": "library_staff", "office_name": "Library Office", "role": "Librarian"},
-            {"username": "lab_incharge", "office_name": "Laboratory In-charge", "role": "Lab In-charge"},
-            {"username": "accounting_staff", "office_name": "Accounting Office", "role": "Accounting Officer"},
-            {"username": "registrar_staff", "office_name": "Registrar's Office", "role": "Registrar"}
-        ]
-        for staff_info in staff_data:
-            user, created = User.objects.get_or_create(
-                username=staff_info["username"],
-                defaults={
-                    "first_name": staff_info["username"].split('_')[0].title(),
-                    "last_name": "Staff",
-                    "email": f"{staff_info['username']}@example.com"
-                }
-            )
-            if created:
-                user.set_password("staffpass123")
-                user.save()
-
-            office = Office.objects.get(name=staff_info["office_name"])
-            staff, created = Staff.objects.get_or_create(
-                user=user,
-                defaults={
-                    "office": office,
-                    "role": staff_info["role"],
-                    "is_dormitory_owner": staff_info.get("is_dormitory_owner", False)
-                }
-            )
-            message = f"Created Staff: {staff.user.username} for {staff.office.name}" if created else f"Staff exists: {staff.user.username}"
-            self.stdout.write(self.style.SUCCESS(message))
+            self.stdout.write(self.style.SUCCESS(f"{'Created' if created else 'Found'} BH Owner: {staff.user.get_full_name()}"))
 
         self.stdout.write(self.style.SUCCESS("\nCreating Program Chairs..."))
-        # Create multiple ProgramChair (dean) users with designations
         program_chair_data = [
             {
                 "username": "pc_set",
                 "first_name": "Zenon A.",
                 "last_name": "Matos, MIT",
                 "email": "pc_set@example.com",
-                "designation": "SET DEAN"
+                "dean": deans[0]  # SET Dean
             },
             {
                 "username": "pc_ste",
                 "first_name": "Star Clyde",
                 "last_name": "Sebial, Ph.D",
                 "email": "pc_ste@example.com",
-                "designation": "STE DEAN"
+                "dean": deans[1]  # STE Dean
             },
             {
                 "username": "pc_socje",
                 "first_name": "Mark E.",
                 "last_name": "Patalinghug, Ph.D",
                 "email": "pc_socje@example.com",
-                "designation": "SOCJE DEAN"
+                "dean": deans[2]  # SOCJE Dean
             },
             {
                 "username": "pc_safes",
                 "first_name": "Teonita Y.",
                 "last_name": "Velasco, Ed.D",
                 "email": "pc_safes@example.com",
-                "designation": "SAFES DEAN"
+                "dean": deans[3]  # SAFES Dean
             }
         ]
 
-        program_chairs_created = []
+        program_chairs = []
         for pc_info in program_chair_data:
-            pc_user, created = User.objects.get_or_create(
+            user, created = User.objects.get_or_create(
                 username=pc_info["username"],
                 defaults={
                     "first_name": pc_info["first_name"],
                     "last_name": pc_info["last_name"],
-                    "email": pc_info["email"]
+                    "email": pc_info["email"],
+                    "is_active": True
                 }
             )
             if created:
-                pc_user.set_password("pc_pass123")
-                pc_user.save()
+                user.set_password("pc_pass123")
+                user.save()
 
             pc, created = ProgramChair.objects.get_or_create(
-                user=pc_user,
+                user=user,
                 defaults={
-                    "designation": pc_info["designation"]
+                    "dean": pc_info["dean"]
                 }
             )
-            program_chairs_created.append(pc)
-            message = f"Created Program Chair: {pc.user.username} with designation {pc.designation}" if created else f"Program Chair exists: {pc.user.username}"
-            self.stdout.write(self.style.SUCCESS(message))
+            program_chairs.append(pc)
+            self.stdout.write(self.style.SUCCESS(f"{'Created' if created else 'Found'} Program Chair: {pc.user.get_full_name()}"))
 
-        self.stdout.write(self.style.SUCCESS("\nCreating Boarder Students..."))
-        # Create boarder students with assignments to BH owners
-        boarder_students_data = [
+        self.stdout.write(self.style.SUCCESS("\nCreating Sample Students..."))
+        student_data = [
             {
-                "username": "boarder1",
+                "username": "set_student1",
                 "password": "student123",
-                "first_name": "Alice",
-                "last_name": "Brown",
-                "email": "alice.brown@student.edu",
-                "student_id": "2023-B001",
-                "course": "Computer Science",
-                "year_level": 2,
-                "bh_owner": bh_owners[0],
-                "payment_amount": 5000.00
-            },
-            {
-                "username": "boarder2",
-                "password": "student123",
-                "first_name": "Bob",
-                "last_name": "Wilson",
-                "email": "bob.wilson@student.edu",
-                "student_id": "2023-B002",
-                "course": "Engineering",
+                "first_name": "John",
+                "last_name": "Doe",
+                "email": "john.doe@student.edu",
+                "student_id": "2023-SET-001",
+                "course": Course.objects.get(code="BSIT"),
                 "year_level": 3,
+                "is_boarder": True,
                 "bh_owner": bh_owners[0],
-                "payment_amount": 4500.00
+                "program_chair": program_chairs[0],
+                "school_year": school_year,
+                "semester": semester
             },
             {
-                "username": "boarder3",
+                "username": "ste_student1",
                 "password": "student123",
-                "first_name": "Carol",
-                "last_name": "Davis",
-                "email": "carol.davis@student.edu",
-                "student_id": "2023-B003",
-                "course": "Business",
+                "first_name": "Jane",
+                "last_name": "Smith",
+                "email": "jane.smith@student.edu",
+                "student_id": "2023-STE-001",
+                "course": Course.objects.get(code="BSED"),
                 "year_level": 2,
+                "is_boarder": True,
                 "bh_owner": bh_owners[1],
-                "payment_amount": 5500.00
+                "program_chair": program_chairs[1],
+                "school_year": school_year,
+                "semester": semester
             }
         ]
-        # Mapping between boarder student usernames and designated program chair usernames.
-        designated_pc = {
-            "boarder1": "pc_set",
-            "boarder2": "pc_ste",
-            "boarder3": "pc_socje"
-        }
-        for student_data in boarder_students_data:
+
+        for student_info in student_data:
             user, created = User.objects.get_or_create(
-                username=student_data["username"],
+                username=student_info["username"],
                 defaults={
-                    "first_name": student_data["first_name"],
-                    "last_name": student_data["last_name"],
-                    "email": student_data["email"]
+                    "first_name": student_info["first_name"],
+                    "last_name": student_info["last_name"],
+                    "email": student_info["email"],
+                    "is_active": True
                 }
             )
             if created:
-                user.set_password("password")
+                user.set_password(student_info["password"])
                 user.save()
 
             student, created = Student.objects.get_or_create(
                 user=user,
                 defaults={
-                    "student_id": student_data["student_id"],
-                    "course": student_data["course"],
-                    "year_level": student_data["year_level"],
-                    "is_boarder": True,
-                    "dormitory_owner": student_data["bh_owner"]
+                    "student_id": student_info["student_id"],
+                    "course": student_info["course"],
+                    "year_level": student_info["year_level"],
+                    "is_boarder": student_info["is_boarder"],
+                    "program_chair": student_info["program_chair"],
+                    "dormitory_owner": student_info["bh_owner"] if student_info["is_boarder"] else None,
+                    "is_approved": True,
+                    "approval_date": timezone.now(),
+                    "approval_admin": admin_user
+                }
+            )
+
+            if created:
+                # Create clearance requests with school year and semester
+                student.create_clearance_requests(
+                    school_year=student_info["school_year"],
+                    semester=student_info["semester"]
+                )
+                
+                # Create clearance record with school year and semester
+                Clearance.objects.get_or_create(
+                    student=student,
+                    school_year=student_info["school_year"],
+                    semester=student_info["semester"],
+                    defaults={'is_cleared': False}
+                )
+                
+                self.stdout.write(self.style.SUCCESS(f"Created student: {student.user.get_full_name()} ({student.student_id})"))
+            else:
+                self.stdout.write(self.style.WARNING(f"Student exists: {student.user.get_full_name()} ({student.student_id})"))
+
+        self.stdout.write(self.style.SUCCESS("\nData population completed successfully!"))
+
+    def create_offices(self):
+        created_count = 0
+        offices = [
+            # Base offices that all students must pass
+            {
+                "name": "OSA",
+                "description": "Office of Student Affairs",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "DSA",
+                "description": "Department of Student Affairs",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "SSC",
+                "description": "Student Services Center",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "LIBRARY",
+                "description": "Library Services",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "LABORATORY",
+                "description": "Laboratory Services",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "ACCOUNTING OFFICE",
+                "description": "Accounting Office",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "REGISTRAR OFFICE",
+                "description": "Registrar Office",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "Guidance Office",
+                "description": "Guidance and Counseling Office",
+                "office_type": "OTHER"
+            },
+            {
+                "name": "DORMITORY",
+                "description": "Dormitory/Boarding House Office",
+                "office_type": "OTHER"
+            },
+            # School-specific SSB offices
+            {
+                "name": "SSB SET",
+                "description": "Student Services Bureau - School of Engineering and Technology",
+                "office_type": "SSB SET"
+            },
+            {
+                "name": "SSB STE",
+                "description": "Student Services Bureau - School of Teacher Education",
+                "office_type": "SSB STE"
+            },
+            {
+                "name": "SSB SOCJE",
+                "description": "Student Services Bureau - School of Criminal Justice Education",
+                "office_type": "SSB SOCJE"
+            },
+            {
+                "name": "SSB SAFES",
+                "description": "Student Services Bureau - School of Agriculture, Forestry and Environmental Sciences",
+                "office_type": "SSB SAFES"
+            },
+            # Dean offices (for permit printing only)
+            {
+                "name": "SET DEAN",
+                "description": "School of Engineering and Technology Dean's Office",
+                "office_type": "SET"
+            },
+            {
+                "name": "STE DEAN",
+                "description": "School of Teacher Education Dean's Office",
+                "office_type": "STE"
+            },
+            {
+                "name": "SOCJE DEAN",
+                "description": "School of Criminal Justice Education Dean's Office",
+                "office_type": "SOCJE"
+            },
+            {
+                "name": "SAFES DEAN",
+                "description": "School of Agriculture, Forestry and Environmental Sciences Dean's Office",
+                "office_type": "SAFES"
+            }
+        ]
+
+        for office_data in offices:
+            office, created = Office.objects.get_or_create(
+                name=office_data["name"],
+                defaults={
+                    "description": office_data["description"],
+                    "office_type": office_data["office_type"]
                 }
             )
             if created:
-                # Create clearance requests for the student
-                student.create_clearance_requests()
-                Payment.objects.create(
-                    student=student,
-                    amount=student_data["payment_amount"],
-                    is_paid=False
-                )
-                Clearance.objects.get_or_create(student=student)
-                self.stdout.write(self.style.SUCCESS(
-                    f"Created boarder student: {student.full_name} ({student.student_id}) assigned to BH Owner: {student_data['bh_owner'].user.get_full_name()}"
-                ))
+                created_count += 1
+                self.stdout.write(self.style.SUCCESS(f"Created office: {office.name}"))
             else:
-                self.stdout.write(self.style.WARNING(
-                    f"Boarder student exists: {student.full_name} ({student.student_id})"
-                ))
+                self.stdout.write(self.style.WARNING(f"Office exists: {office.name}"))
 
-            # Assign the designated Program Chair if applicable
-            pc_username = designated_pc.get(student_data["username"])
-            if pc_username:
-                assigned_pc = ProgramChair.objects.filter(user__username=pc_username).first()
-                if assigned_pc:
-                    student.program_chair = assigned_pc
-                    student.save()
-                    self.stdout.write(self.style.SUCCESS(
-                        f"Assigned Program Chair {assigned_pc.user.get_full_name()} ({assigned_pc.designation}) to student: {student.student_id}"
-                    ))
-
-        self.stdout.write(self.style.SUCCESS("\nUpdating Clearance Requests and Unlocking Permits..."))
-        # For testing purposes, approve all clearance requests and unlock printing
-        for student in Student.objects.all():
-            # Ensure a Clearance record exists for the student.
-            clearance, created = Clearance.objects.get_or_create(student=student)
-            for clearance_request in student.clearance_requests.all():
-                # Use the student's dormitory owner for Dormitory clearances.
-                if clearance_request.office.name == "Dormitory":
-                    staff = student.dormitory_owner
-                else:
-                    staff = Staff.objects.filter(office=clearance_request.office).first()
-                if staff:
-                    clearance_request.approve(staff)
-            clearance.check_clearance()  # Sets is_cleared to True if no pending/denied requests
-            clearance.program_chair_approved = True  # Unlock permit for printing
-            clearance.save()
-            self.stdout.write(self.style.SUCCESS(
-                f"Unlocked printing for student: {student.full_name}"
-            ))
-
-        self.stdout.write(self.style.SUCCESS("\nData population completed successfully!"))
+        self.stdout.write(self.style.SUCCESS(f"\nCreated {created_count} new offices"))

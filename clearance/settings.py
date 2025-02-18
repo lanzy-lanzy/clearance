@@ -132,6 +132,10 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+STUDENT_PROFILE_UPLOAD_PATH = 'student_profiles'
+
 TEMPLATES[0]['DIRS'].append(os.path.join(BASE_DIR, 'templates'))
 
 LOGIN_URL='login'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = '/'  # Redirects to home page after logout

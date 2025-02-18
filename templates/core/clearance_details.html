@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block sidebar %}
+{% include "components/student_sidenav.html" %}
+{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <!-- Header -->
+        <div class="bg-emerald-600 px-6 py-4">
+            <h1 class="text-2xl font-bold text-white">Clearance Details</h1>
+            <p class="text-emerald-100">
+                {{ clearance.school_year }} - {{ clearance.get_semester_display }}
+            </p>
+        </div>
+
+        <!-- Student Info -->
+        <div class="p-6 border-b">
+            <h2 class="text-xl font-semibold mb-4">Student Information</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-gray-600">Name</p>
+                    <p class="font-medium">{{ student.user.get_full_name }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Student ID</p>
+                    <p class="font-medium">{{ student.student_id }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Course</p>
+                    <p class="font-medium">{{ student.course }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Status</p>
+                    <p class="font-medium">
+                        {% if clearance.is_cleared %}
+                            <span class="text-emerald-600">Cleared</span>
+                        {% else %}
+                            <span class="text-amber-600">Pending</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clearance Requests -->
+        <div class="p-6">
+            <h2 class="text-xl font-semibold mb-4">Office Clearances</h2>
+            <div class="space-y-4">
+                {% for request in clearance_requests %}
+                <div class="border rounded-lg p-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="font-medium">{{ request.office.name }}</h3>
+                            <p class="text-sm text-gray-600">
+                                Status: 
+                                <span class="
+                                    {% if request.status == 'approved' %}text-emerald-600
+                                    {% elif request.status == 'denied' %}text-red-600
+                                    {% else %}text-amber-600{% endif %}
+                                ">
+                                    {{ request.get_status_display }}
+                                </span>
+                            </p>
+                        </div>
+                        {% if request.reviewed_by %}
+                        <div class="text-sm text-gray-600">
+                            Reviewed by: {{ request.reviewed_by.user.get_full_name }}
+                            <br>
+                            {{ request.reviewed_date|date:"M d, Y" }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if request.notes %}
+                    <div class="mt-2 text-sm text-gray-700">
+                        <p class="font-medium">Notes:</p>
+                        <p>{{ request.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

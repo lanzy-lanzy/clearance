@@ -3,7 +3,42 @@ from django.contrib.auth.models import User
 from django.dispatch import receiver 
 from django.db.models.signals import post_save
 from django.utils import timezone
-from django.utils import timezone
+import os
+from django.conf import settings
+from django.templatetags.static import static
+
+SEMESTER_CHOICES = [
+    ('1ST', 'First Semester'),
+    ('2ND', 'Second Semester'),
+    ('SUM', 'Summer')
+]
+
+class Dean(models.Model):
+    """
+    Represents a dean (or school head) who can be assigned to courses.
+    This model can be managed dynamically via Django Admin.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    logo = models.ImageField(upload_to='dean_logos/', blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class Course(models.Model):
+    code = models.CharField(max_length=10, unique=True)  # e.g., BSIT, BPED
+    name = models.CharField(max_length=100)  # e.g., Bachelor of Science in Information Technology
+    dean = models.ForeignKey(Dean, on_delete=models.CASCADE, related_name='courses')
+    is_active = models.BooleanField(default=True)  # To mark if course is currently offered
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['code']
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
 
 class Office(models.Model):
     """Represents different offices handling clearance."""
@@ -20,6 +55,8 @@ class Office(models.Model):
     ]
     name = models.CharField(max_length=255, unique=True)
     office_type = models.CharField(max_length=50, choices=OFFICE_TYPES, default='OTHER')
+    # New field: associate an office to a specific program (dean)
+    affiliated_dean = models.ForeignKey(Dean, on_delete=models.SET_NULL, null=True, blank=True, help_text="Associate this office with a specific dean (program)")
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -31,75 +68,33 @@ class Staff(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     office = models.ForeignKey(Office, on_delete=models.CASCADE, related_name='staff')
     role = models.CharField(max_length=100, blank=True, null=True)
-    is_dormitory_owner = models.BooleanField(default=False)  # 🔹 New field for dormitory manager
+    is_dormitory_owner = models.BooleanField(default=False)  # For dormitory (BH) manager
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.office.name}"
 
-# Add ProgramChair model
-
-import os
-from django.conf import settings
-
 class ProgramChair(models.Model):
     """Represents a program chair (dean) user responsible for final clearance approval."""
-    DESIGNATION_CHOICES = [
-        ('SET DEAN', 'School of Engineering and Technology (BSIT)'),
-        ('STE DEAN', 'School of Teacher Education (BPED,BEED,BSED,BAELS,BSMATH)'),
-        ('SOCJE DEAN', 'School of Criminal Justice Education (BSCRIM,BSISM)'),
-        ('SAFES DEAN', 'School of Agriculture Forestry and Environmental Science (BSA,BSAES,BCF)'),
-    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    designation = models.CharField(max_length=50, choices=DESIGNATION_CHOICES)
+    # Instead of designations via a string, we link to the Dean model
+    dean = models.ForeignKey(Dean, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.get_full_name()} - {self.get_designation_display()}"
+        dean_name = self.dean.name if self.dean else "No Dean Assigned"
+        return f"{self.user.get_full_name()} - {dean_name}"
 
     def get_logo_url(self):
-        # Map each designation to a specific static logo path
-        logo_mapping = {
-            'SET DEAN': 'img/logo_set.png',
-            'STE DEAN': 'img/logo_ste.png',
-            'SOCJE DEAN': 'img/logo_socje.png',
-            'SAFES DEAN': 'img/logo_safes.png',
-        }
-
-        designated_logo = logo_mapping.get(self.designation)
-        if designated_logo:
-            # Construct the absolute path of the logo file
-            logo_path = os.path.join(settings.BASE_DIR, 'static', designated_logo)
+        if self.dean and self.dean.logo:
+            logo_path = os.path.join(settings.BASE_DIR, 'static', self.dean.logo.name)
             if os.path.exists(logo_path):
-                return designated_logo
-        # Return default permit logo if designated logo is missing
+                return self.dean.logo.url
         return 'img/permit_logo.png'
 
 class Student(models.Model):
     """Represents students requesting clearance."""
-    COURSE_CHOICES = {
-        'SET DEAN': [
-            ('BSIT', 'Bachelor of Science in Information Technology'),
-        ],
-        'STE DEAN': [
-            ('BPED', 'Bachelor in Physical Education'),
-            ('BEED', 'Bachelor in Elementary Education'),
-            ('BSED', 'Bachelor of Secondary Education'),
-            ('BAELS', 'Bachelor of Arts in English Language Studies'),
-            ('BSMATH', 'Bachelor of Science in Mathematics'),
-        ],
-        'SOCJE DEAN': [
-            ('BSCRIM', 'Bachelor of Science in Criminology'),
-            ('BSISM', 'Bachelor of Science in Industrial Security Management'),
-        ],
-        'SAFES DEAN': [
-            ('BSA', 'Bachelor of Science in Agriculture'),
-            ('BSAES', 'Bachelor of Science in Agricultural Engineering Science'),
-            ('BCF', 'Bachelor in Community Forestry'),
-        ],
-    }
-
     student_id = models.CharField(max_length=20, unique=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    course = models.CharField(max_length=255)
+    course = models.ForeignKey(Course, on_delete=models.PROTECT)
     year_level = models.IntegerField()
     is_boarder = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -108,40 +103,101 @@ class Student(models.Model):
     is_approved = models.BooleanField(default=False)
     approval_date = models.DateTimeField(null=True, blank=True)
     approval_admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_students')
+    profile_picture = models.ImageField(
+        upload_to='student_profiles/',
+        null=True,
+        blank=True
+    )
+
+    def get_profile_picture_url(self):
+        if self.profile_picture and hasattr(self.profile_picture, 'url'):
+            return self.profile_picture.url
+        return static('img/default-profile.png')
 
     @property
     def full_name(self):
-            return self.user.get_full_name()
+        return self.user.get_full_name()
 
     def __str__(self):
-            return f"{self.full_name} ({self.student_id})"
+        return f"{self.full_name} ({self.student_id})"
     
     def approve_student(self, admin_user):
-        """Approve a student's registration"""
+        """Approve a student's registration."""
         self.is_approved = True
         self.approval_date = timezone.now()
         self.approval_admin = admin_user
         self.save()
 
-    def create_clearance_requests(self):
-            """Creates clearance requests for all required offices, including Dormitory if boarder."""
-            from core.models import Office, ClearanceRequest  # import here to avoid circular imports
-            required_offices = Office.objects.all()
-            dormitory_office = Office.objects.filter(name="Dormitory").first()
-            if self.is_boarder and dormitory_office:
-                # Ensure the dormitory office is included (it might already be in required_offices)
-                required_offices = required_offices | Office.objects.filter(id=dormitory_office.id)
-            for office in required_offices:
-                ClearanceRequest.objects.get_or_create(student=self, office=office)
+    def create_clearance_requests(self, school_year, semester):
+        """
+        Creates clearance requests for a specific semester and school year.
+        """
+        from core.models import ClearanceRequest, Clearance  # to avoid circular import
+        
+        # Base offices that all students must pass
+        base_offices = [
+            'OSA', 'DSA', 'SSC', 'LIBRARY', 'LABORATORY',
+            'ACCOUNTING OFFICE', 'REGISTRAR OFFICE', 'Guidance Office'
+        ]
+
+        # Add dean-specific offices based on student's program chair
+        # Note: Dean offices are not included in clearance requests
+        # They are only for permit printing purposes
+        if self.program_chair and self.program_chair.dean:
+            dean_name = self.program_chair.dean.name
+            if 'SET' in dean_name:
+                # For SET students, add SSB SET to their clearance requirements
+                base_offices.append('SSB SET')
+            elif 'STE' in dean_name:
+                # For STE students, add SSB STE to their clearance requirements
+                base_offices.append('SSB STE')
+            elif 'SOCJE' in dean_name:
+                # For SOCJE students, add SSB SOCJE to their clearance requirements
+                base_offices.append('SSB SOCJE')
+            elif 'SAFES' in dean_name:
+                # For SAFES students, add SSB SAFES to their clearance requirements
+                base_offices.append('SSB SAFES')
+
+        required_offices = Office.objects.filter(name__in=base_offices)
+        
+        # Add dormitory clearance if student is a boarder
+        if self.is_boarder:
+            try:
+                dorm_office = Office.objects.get(name='DORMITORY')
+                required_offices = list(required_offices)
+                required_offices.append(dorm_office)
+            except Office.DoesNotExist:
+                print("Dormitory office not found.")
+
+        # Create or get clearance record for this semester
+        clearance, _ = Clearance.objects.get_or_create(
+            student=self,
+            school_year=school_year,
+            semester=semester,
+            defaults={'is_cleared': False}
+        )
+
+        # Create clearance requests for each required office
+        for office in required_offices:
+            ClearanceRequest.objects.get_or_create(
+                student=self,
+                office=office,
+                school_year=school_year,
+                semester=semester,
+                defaults={'status': 'pending'}
+            )
+
 @receiver(post_save, sender=User)
 def create_student_profile(sender, instance, created, **kwargs):
-    # Remove automatic student creation since we'll handle it in the view
+    # Automatic student profile creation is disabled as it is managed in view logic.
     pass
 
 class ClearanceRequest(models.Model):
     """Represents clearance requests for students dynamically per office."""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='clearance_requests')
     office = models.ForeignKey(Office, on_delete=models.CASCADE, related_name='clearance_requests')
+    school_year = models.CharField(max_length=9)  # Format: 2023-2024
+    semester = models.CharField(max_length=3, choices=SEMESTER_CHOICES)
     status_choices = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -154,12 +210,15 @@ class ClearanceRequest(models.Model):
     reviewed_date = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True, help_text="Reasons for pending or denied clearance.")
 
+    class Meta:
+        unique_together = ['student', 'office', 'school_year', 'semester']
+        ordering = ['-school_year', '-semester', '-request_date']
+
     def __str__(self):
-        return f"{self.student} - {self.office} ({self.status})"
+        return f"{self.student} - {self.office} - {self.school_year} {self.get_semester_display()} ({self.status})"
 
     def approve(self, staff):
-        """Approve the clearance request with proper permission checks."""
-        if self.office.name == "Dormitory":
+        if self.office.name == "DORMITORY":
             if not staff.is_dormitory_owner:
                 raise PermissionError("Only dormitory owners can approve dormitory clearances.")
             if self.student.dormitory_owner != staff:
@@ -170,9 +229,16 @@ class ClearanceRequest(models.Model):
         self.reviewed_date = timezone.now()
         self.save()
 
+        # Check if all clearances for this semester are complete
+        clearance = Clearance.objects.get(
+            student=self.student,
+            school_year=self.school_year,
+            semester=self.semester
+        )
+        clearance.check_clearance()
+
     def deny(self, staff, reason):
-        """Deny the clearance request with proper permission checks."""
-        if self.office.name == "Dormitory":
+        if self.office.name == "DORMITORY":
             if not staff.is_dormitory_owner:
                 raise PermissionError("Only dormitory owners can deny dormitory clearances.")
             if self.student.dormitory_owner != staff:
@@ -186,43 +252,43 @@ class ClearanceRequest(models.Model):
 
 class Clearance(models.Model):
     """Represents the final clearance status of a student."""
-    student = models.OneToOneField(Student, on_delete=models.CASCADE, related_name='clearance')
+    SEMESTER_CHOICES = SEMESTER_CHOICES  # Reference the module-level choices
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='clearances')
+    school_year = models.CharField(max_length=9)  # Format: 2023-2024
+    semester = models.CharField(max_length=3, choices=SEMESTER_CHOICES)
     is_cleared = models.BooleanField(default=False)
     cleared_date = models.DateTimeField(null=True, blank=True)
     program_chair_approved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['student', 'school_year', 'semester']
+        ordering = ['-school_year', '-semester']
 
     def check_clearance(self):
-        """Checks if all clearance requests are approved before allowing the program chair to unlock the permit."""
-        pending_requests = self.student.clearance_requests.filter(status='pending').exists()
-        denied_requests = self.student.clearance_requests.filter(status='denied').exists()
+        # Check clearance requests for this specific semester and school year
+        pending_requests = self.student.clearance_requests.filter(
+            school_year=self.school_year,
+            semester=self.semester,
+            status='pending'
+        ).exists()
+        denied_requests = self.student.clearance_requests.filter(
+            school_year=self.school_year,
+            semester=self.semester,
+            status='denied'
+        ).exists()
+        
         if not pending_requests and not denied_requests:
             self.is_cleared = True
-            self.cleared_date = timezone.now()  # Use a datetime value here.
+            self.cleared_date = timezone.now()
             self.save()
 
     def unlock_permit(self):
-        """Allows the program chair to approve the final clearance for printing."""
         if self.is_cleared:
             self.program_chair_approved = True
             self.save()
 
     def __str__(self):
-        return f"{self.student} - {'Cleared' if self.is_cleared else 'Not Cleared'} - {'Permit Unlocked' if self.program_chair_approved else 'Permit Locked'}"
-
-
-from django.db import models
-from django.contrib.auth.models import User
-
-# ...
-
-class Payment(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
-    is_paid = models.BooleanField(default=False)
-    payment_date = models.DateTimeField(blank=True, null=True)
-
-    def __str__(self):
-        status = "Paid" if self.is_paid else "Unpaid"
-        return f"{self.student.full_name} - {status} - {self.amount}"
-
-
+        status = 'Cleared' if self.is_cleared else 'Not Cleared'
+        permit_status = 'Permit Unlocked' if self.program_chair_approved else 'Permit Locked'
+        return f"{self.student} - {self.school_year} {self.get_semester_display()} - {status} - {permit_status}"
