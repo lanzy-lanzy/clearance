@@ -182,7 +182,15 @@
     <!-- Pending User Approvals -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
         <div class="p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Pending User Approvals</h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Pending User Approvals</h2>
+                {% if pending_approvals %}
+                <span class="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+                    {{ pending_approvals|length }} Pending
+                </span>
+                {% endif %}
+            </div>
+            {% if pending_approvals %}
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead>
@@ -196,13 +204,13 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for pending_user in pending_approvals %}
-                        <tr class="hover:bg-gray-50 transition-colors">
+                        <tr class="hover:bg-gray-50 transition-colors" id="user-row-{{ pending_user.id }}">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-10 w-10">
                                         <img class="h-10 w-10 rounded-full object-cover" 
                                              src="{{ pending_user.get_profile_picture_url }}" 
-                                             alt="">
+                                             alt="{{ pending_user.get_full_name }}'s profile picture">
                                     </div>
                                     <div class="ml-4">
                                         <div class="text-sm font-medium text-gray-900">{{ pending_user.get_full_name }}</div>
@@ -210,37 +218,219 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pending_user.student.student_id }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pending_user.student.course }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pending_user.date_joined|date:"M d, Y" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ pending_user.student.student_id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ pending_user.student.course }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ pending_user.date_joined|date:"M d, Y" }}
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                <form method="POST" action="{% url 'approve_user' pending_user.id %}" class="inline">
-                                    {% csrf_token %}
-                                    <button type="submit" name="action" value="approve" 
-                                            class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-4 py-2 rounded-lg transition-colors inline-flex items-center">
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                        </svg>
-                                        Approve
-                                    </button>
-                                </form>
-                                <form method="POST" action="{% url 'reject_user' pending_user.id %}" class="inline">
-                                    {% csrf_token %}
-                                    <button type="submit" name="action" value="reject" 
-                                            class="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg transition-colors inline-flex items-center">
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
-                                        Reject
-                                    </button>
-                                </form>
+                                <button onclick="showUserDetails('{{ pending_user.id }}')"
+                                        class="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    View
+                                </button>
+                                <button onclick="approveUser('{{ pending_user.id }}')"
+                                        class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    Approve
+                                </button>
+                                <button onclick="showRejectModal('{{ pending_user.id }}')"
+                                        class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                    Reject
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            {% else %}
+            <div class="text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No pending approvals</h3>
+                <p class="mt-1 text-sm text-gray-500">All student registrations have been processed.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- User Details Modal -->
+    <div id="userDetailsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Student Registration Details</h3>
+                <button onclick="closeUserDetails()" class="text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="userDetailsContent" class="space-y-4">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Modal -->
+    <div id="rejectModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900">Reject Registration</h3>
+                <form id="rejectForm" class="mt-2">
+                    {% csrf_token %}
+                    <textarea name="reason" class="w-full p-2 border rounded-md" rows="4" required 
+                              placeholder="Please provide a reason for rejection"></textarea>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" onclick="closeRejectModal()" 
+                                class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md">Cancel</button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Reject</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 {% endblock admin_content %}
+
+<script>
+let currentUserId = null;
+
+function showUserDetails(userId) {
+    currentUserId = userId;
+    const modal = document.getElementById('userDetailsModal');
+    const content = document.getElementById('userDetailsContent');
+    
+    // Fetch user details
+    fetch(`/api/user-details/${userId}/`)
+        .then(response => response.json())
+        .then(data => {
+            content.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Full Name</label>
+                        <p class="mt-1 text-sm text-gray-900">${data.full_name}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Student ID</label>
+                        <p class="mt-1 text-sm text-gray-900">${data.student_id}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Email</label>
+                        <p class="mt-1 text-sm text-gray-900">${data.email}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Course</label>
+                        <p class="mt-1 text-sm text-gray-900">${data.course}</p>
+                    </div>
+                    <!-- Add more fields as needed -->
+                </div>
+            `;
+        });
+    
+    modal.classList.remove('hidden');
+}
+
+function closeUserDetails() {
+    const modal = document.getElementById('userDetailsModal');
+    modal.classList.add('hidden');
+    currentUserId = null;
+}
+
+function approveUser(userId) {
+    if (!confirm('Are you sure you want to approve this registration?')) return;
+
+    fetch(`/api/approve-registration/${userId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the row from the table
+            document.getElementById(`user-row-${userId}`).remove();
+            // Show success message
+            showNotification('Registration approved successfully', 'success');
+        } else {
+            showNotification(data.error || 'Failed to approve registration', 'error');
+        }
+    });
+}
+
+function showRejectModal(userId) {
+    currentUserId = userId;
+    const modal = document.getElementById('rejectModal');
+    modal.classList.remove('hidden');
+}
+
+function closeRejectModal() {
+    const modal = document.getElementById('rejectModal');
+    const form = document.getElementById('rejectForm');
+    form.reset();
+    modal.classList.add('hidden');
+    currentUserId = null;
+}
+
+document.getElementById('rejectForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const reason = this.reason.value;
+    
+    fetch(`/api/reject-registration/${currentUserId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+        body: JSON.stringify({ reason: reason })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the row from the table
+            document.getElementById(`user-row-${currentUserId}`).remove();
+            // Close modal
+            closeRejectModal();
+            // Show success message
+            showNotification('Registration rejected successfully', 'success');
+        } else {
+            showNotification(data.error || 'Failed to reject registration', 'error');
+        }
+    });
+});
+
+function showNotification(message, type) {
+    // Implement your notification system here
+    // This is a basic alert, but you might want to use a more sophisticated notification system
+    alert(message);
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const userDetailsModal = document.getElementById('userDetailsModal');
+    const rejectModal = document.getElementById('rejectModal');
+    
+    if (event.target == userDetailsModal) {
+        closeUserDetails();
+    }
+    if (event.target == rejectModal) {
+        closeRejectModal();
+    }
+}
+</script>

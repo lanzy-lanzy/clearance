@@ -15,26 +15,12 @@ import os
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.views.decorators.http import require_POST
-
-# PDF Generation
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-
-# Excel Generation
-from openpyxl import Workbook
-
-# Local imports
-from core.models import (
-    ClearanceRequest, Clearance, Staff, Student, 
-    Office, ProgramChair, User, Dean, Course,
-    UserProfile,  # Add this import
-    SEMESTER_CHOICES
+from django.db.models import Count
+# Add Office to the imports
+from .models import (
+    Student, Staff, ProgramChair, Course, 
+    Clearance, ClearanceRequest, Office
 )
-
-# Basic Views
 
 def user_logout(request):
     logout(request)
@@ -319,14 +305,28 @@ def admin_deans(request):
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def admin_dashboard(request):
+    # Get pending student registrations
+    pending_approvals = Student.objects.filter(
+        is_approved=False,
+        user__is_active=False
+    ).select_related('user', 'course').order_by('-user__date_joined')
+
     context = {
-         'total_students': Student.objects.count(),
-         'total_offices': Office.objects.count(),
-         'total_staff': Staff.objects.count(),
-         'total_program_chairs': ProgramChair.objects.count(),
-         'courses_count': Course.objects.count(),
-         'total_deans': Dean.objects.count(),
-         # Add more context variables as needed.
+        'total_students': Student.objects.count(),
+        'total_staff': Staff.objects.count(),
+        'total_program_chairs': ProgramChair.objects.count(),
+        'clearance_stats': {
+            'total': Clearance.objects.count(),
+            'pending': ClearanceRequest.objects.filter(status='pending').count(),
+            'approved': ClearanceRequest.objects.filter(status='approved').count(),
+            'denied': ClearanceRequest.objects.filter(status='denied').count(),
+        },
+        'recent_clearances': Clearance.objects.select_related('student')[:5],
+        'offices': Office.objects.annotate(
+            staff_count=Count('staff'),
+            pending_requests=Count('clearance_requests', filter=Q(clearance_requests__status='pending'))
+        ),
+        'pending_approvals': pending_approvals,
     }
     return render(request, 'admin/dashboard.html', context)
 
@@ -844,18 +844,41 @@ def approve_clearance_request(request, request_id):
         staff = request.user.staff
         clearance_request = get_object_or_404(ClearanceRequest, id=request_id)
         
+        # Check if staff member belongs to the office of the clearance request
+        if staff.office != clearance_request.office:
+            messages.error(
+                request,
+                f"You don't have permission to handle clearance requests for {clearance_request.office.name}"
+            )
+            return redirect(request.META.get('HTTP_REFERER', 'staff_dashboard'))
+
+        # Check if request is already processed
+        if clearance_request.status != 'pending':
+            messages.error(request, 'This request has already been processed')
+            return redirect(request.META.get('HTTP_REFERER', 'staff_dashboard'))
+        
         # Approve the request
         clearance_request.approve(staff)
         
-        messages.success(request, 'Clearance request approved successfully.')
-        return JsonResponse({'status': 'success'})
+        # Update the student's overall clearance status
+        clearance = Clearance.objects.get(
+            student=clearance_request.student,
+            school_year=clearance_request.school_year,
+            semester=clearance_request.semester
+        )
+        clearance.check_clearance()
         
-    except PermissionError as e:
-        messages.error(request, str(e))
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=403)
+        messages.success(
+            request,
+            f'Successfully approved clearance request for {clearance_request.student.full_name}'
+        )
+        
+    except Staff.DoesNotExist:
+        messages.error(request, 'Staff access required')
     except Exception as e:
-        messages.error(request, f'Error approving request: {str(e)}')
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        messages.error(request, f'Error processing request: {str(e)}')
+    
+    return redirect(request.META.get('HTTP_REFERER', 'staff_dashboard'))
 
 @login_required
 @require_POST
@@ -865,28 +888,48 @@ def deny_clearance_request(request, request_id):
         staff = request.user.staff
         clearance_request = get_object_or_404(ClearanceRequest, id=request_id)
         
-        # Get reason from request body
-        data = json.loads(request.body)
-        reason = data.get('reason')
+        # Check if staff member belongs to the office of the clearance request
+        if staff.office != clearance_request.office:
+            messages.error(
+                request,
+                f"You don't have permission to handle clearance requests for {clearance_request.office.name}"
+            )
+            return redirect(request.META.get('HTTP_REFERER', 'staff_dashboard'))
+
+        # Check if request is already processed
+        if clearance_request.status != 'pending':
+            messages.error(request, 'This request has already been processed')
+            return redirect(request.META.get('HTTP_REFERER', 'staff_dashboard'))
+        
+        # Get reason from POST data
+        reason = request.POST.get('reason')
         
         if not reason:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'A reason must be provided for denial'
-            }, status=400)
+            messages.error(request, 'A reason must be provided for denial')
+            return redirect(request.META.get('HTTP_REFERER', 'staff_dashboard'))
         
         # Deny the request
         clearance_request.deny(staff, reason)
         
-        messages.success(request, 'Clearance request denied.')
-        return JsonResponse({'status': 'success'})
+        # Update the student's overall clearance status
+        clearance = Clearance.objects.get(
+            student=clearance_request.student,
+            school_year=clearance_request.school_year,
+            semester=clearance_request.semester
+        )
+        clearance.check_clearance()
         
-    except PermissionError as e:
-        messages.error(request, str(e))
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=403)
+        messages.success(
+            request,
+            f'Successfully denied clearance request for {clearance_request.student.full_name}'
+        )
+        
+    except Staff.DoesNotExist:
+        messages.error(request, 'Staff access required')
     except Exception as e:
-        messages.error(request, f'Error denying request: {str(e)}')
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        messages.error(request, f'Error processing request: {str(e)}')
+    
+    return redirect(request.META.get('HTTP_REFERER', 'staff_dashboard'))
 
 @login_required
 def staff_clearance_history(request):
@@ -950,7 +993,7 @@ def staff_clearance_history(request):
         'SEMESTER_CHOICES': SEMESTER_CHOICES,
     }
 
-    return render(request, 'staff/clearance_history.html', context)
+    return render(request, 'core/staff_clearance_history.html', context)  # Updated path
 @login_required
 def staff_profile(request):
     """
@@ -979,7 +1022,7 @@ def staff_profile(request):
         'assigned_students': staff.students_dorm.all() if staff.is_dormitory_owner else None,
     }
 
-    return render(request, 'staff/profile.html', context)
+    return render(request, 'core/staff_profile.html', context)  # Updated template path
 
 @login_required
 def view_request(request, request_id):
@@ -1041,6 +1084,75 @@ def view_request(request, request_id):
     }
 
     return render(request, 'staff/view_request.html', context)
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+def get_user_details(request, user_id):
+    """API endpoint to get detailed user information"""
+    try:
+        student = Student.objects.select_related('user', 'course').get(user_id=user_id)
+        data = {
+            'full_name': f"{student.user.first_name} {student.user.last_name}",
+            'student_id': student.student_id,
+            'email': student.user.email,
+            'course': student.course.name,
+            'year_level': student.year_level,
+            'is_boarder': student.is_boarder,
+        }
+        return JsonResponse(data)
+    except Student.DoesNotExist:
+        return JsonResponse({'error': 'Student not found'}, status=404)
+
+@require_POST
+def approve_registration(request, user_id):
+    """API endpoint to approve student registration"""
+    try:
+        student = Student.objects.get(user_id=user_id)
+        student.is_approved = True
+        student.approval_date = timezone.now()
+        student.approval_admin = request.user
+        student.user.is_active = True
+        student.user.save()
+        student.save()
+        return JsonResponse({'success': True})
+    except Student.DoesNotExist:
+        return JsonResponse({'error': 'Student not found'}, status=404)
+
+@require_POST
+def reject_registration(request, user_id):
+    """API endpoint to reject student registration"""
+    try:
+        data = json.loads(request.body)
+        reason = data.get('reason')
+        
+        student = Student.objects.get(user_id=user_id)
+        student.user.delete()  # This will cascade delete the student profile
+        
+        # Could add notification logic here
+        
+        return JsonResponse({'success': True})
+    except Student.DoesNotExist:
+        return JsonResponse({'error': 'Student not found'}, status=404)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

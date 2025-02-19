@@ -27,6 +27,8 @@
                                 {{ user.get_full_name }}
                             {% elif user.student %}
                                 {{ user.student.full_name }}
+                            {% elif user.staff %}
+                                {{ user.get_full_name }}
                             {% else %}
                                 {{ user.get_full_name }}
                             {% endif %}
@@ -36,6 +38,8 @@
                                 Program Chair
                             {% elif user.student %}
                                 Student
+                            {% elif user.staff %}
+                                Staff
                             {% elif user.is_superuser %}
                                 Administrator
                             {% endif %}
@@ -50,6 +54,10 @@
                                  class="w-10 h-10 rounded-full object-cover">
                         {% elif user.programchair %}
                             <img src="{{ user.programchair.get_profile_picture_url }}" 
+                                 alt="Profile" 
+                                 class="w-10 h-10 rounded-full object-cover">
+                        {% elif user.staff %}
+                            <img src="{{ user.staff.get_profile_picture_url }}" 
                                  alt="Profile" 
                                  class="w-10 h-10 rounded-full object-cover">
                         {% elif user.is_superuser %}
@@ -77,6 +85,16 @@
                                 </a>
                             {% elif user.programchair %}
                                 <a href="{% url 'program_chair_profile' %}" 
+                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-t-lg transition-colors">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                        </svg>
+                                        View Profile
+                                    </div>
+                                </a>
+                            {% elif user.staff %}
+                                <a href="{% url 'staff_profile' %}" 
                                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-t-lg transition-colors">
                                     <div class="flex items-center">
                                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
